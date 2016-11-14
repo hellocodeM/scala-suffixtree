@@ -6,7 +6,14 @@ import scala.collection.mutable.ArrayBuffer
 /**
   * Created by ming on 16-11-12.
   */
-case class SubString(source: String, start: Int, end: Int, label: String) {
+trait SubString {
+  val source: String
+  val start: Int
+  val end: Int
+  val label: String
+}
+
+case class RangeSubString(source: String, start: Int, end: Int, label: String) extends SubString {
 
   def apply(idx: Int): Char = source(start + idx)
 
@@ -16,13 +23,13 @@ case class SubString(source: String, start: Int, end: Int, label: String) {
 
   def nonEmpty = source.nonEmpty && start < end
 
-  def substring(s: Int) = SubString(source, start + s, end, label)
+  def substring(s: Int) = RangeSubString(source, start + s, end, label)
 
-  def substring(s: Int, e: Int) = SubString(source, start + s, start + e, label)
+  def substring(s: Int, e: Int) = RangeSubString(source, start + s, start + e, label)
 
   def head: Char = source(start)
 
-  def commonPrefix(rhs: SubString): SubString = {
+  def commonPrefix(rhs: RangeSubString): RangeSubString = {
     val len = length min rhs.length
     for (i <- 0 until len) {
       if (this (i) != rhs(i)) {
@@ -49,7 +56,7 @@ class TreeNode {
 
   def childNode(ch: Char): TreeNode = children(ch).targetNode
 
-  def addChild(str: SubString): Unit = {
+  def addChild(str: RangeSubString): Unit = {
     children += str.head -> TreeEdge(str, new TreeNode)
   }
 
@@ -58,7 +65,7 @@ class TreeNode {
   }
 }
 
-case class TreeEdge(var seq: SubString, targetNode: TreeNode) {
+case class TreeEdge(var seq: RangeSubString, targetNode: TreeNode) {
 
   def splitAt(idx: Int): TreeEdge = {
     val x = TreeEdge(seq.take(idx), new TreeNode())
@@ -75,11 +82,11 @@ class SuffixTree {
     val mangled = str + '$'
 
     for (s <- 0 to mangled.length) {
-      insertSuffix(SubString(mangled, s, mangled.length, label))
+      insertSuffix(RangeSubString(mangled, s, mangled.length, label))
     }
   }
 
-  def insertSuffix(origin: SubString): Unit = {
+  def insertSuffix(origin: RangeSubString): Unit = {
     var iter = root
     var sub = origin
 
@@ -103,6 +110,7 @@ class SuffixTree {
     }
   }
 
+
   def strings: Array[String] = {
     val res = new ArrayBuffer[String]
     val buff = new StringBuffer()
@@ -122,4 +130,26 @@ class SuffixTree {
     res.toArray
   }
 
+  def nodes: Iterator[TreeNode] = {
+    new PrefixNodeIterator
+  }
+
+  def edges: Iterator[TreeEdge] = {
+    throw new UnsupportedOperationException
+  }
+
+  class PrefixNodeIterator extends Iterator[TreeNode] {
+
+    private val toVisit = mutable.Stack[TreeNode](root)
+
+    override def hasNext: Boolean = {
+      toVisit.nonEmpty
+    }
+
+    override def next(): TreeNode = {
+      val res = toVisit.pop
+      toVisit.pushAll(res.children.values.map(_.targetNode))
+      res
+    }
+  }
 }
