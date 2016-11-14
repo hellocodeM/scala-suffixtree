@@ -1,87 +1,125 @@
 package com.wanghuanming
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /**
   * Created by ming on 16-11-12.
   */
-case class TreeNode(var value: Int = -1,
-                    var source: String = null,
-                    var children: Array[TreeNode] = null)
+case class SubString(source: String, start: Int, end: Int, label: String) {
 
-class SuffixTree {
-  val numCharacters = 26
+  def apply(idx: Int): Char = source(start + idx)
 
-  var root = new TreeNode
+  def length = end - start
 
-  def insert(str: String, value: Int, source: String): Unit = {
-    var iter = root
-    for (ch <- str) {
-      if (iter.children == null) {
-        iter.children = new Array[TreeNode](numCharacters)
-      }
-      if (iter.children(indexOfChar(ch)) == null) {
-        iter.children(indexOfChar(ch)) = new TreeNode
-      }
-      iter = iter.children(indexOfChar(ch))
-    }
-    iter.value = value
-    iter.source = source
-  }
+  def isEmpty = source.isEmpty || start >= end
 
-  def insertAllSuffix(str: String, source: String): Unit = {
-    for (i <- 0 until str.length) {
-      insert(str.substring(i), i, source)
-    }
-  }
+  def nonEmpty = source.nonEmpty && start < end
 
-  def foreachLeaf(fn: (TreeNode, Int) => Unit): Unit = {
-    def dfs(height: Int, root: TreeNode, fn: (TreeNode, Int) => Unit): Unit = {
-      if (root != null ) {
-        // leaf node
-        if (root.children == null) {
-          fn(root, height)
-        } else {
-          // branch node
-          root.children.foreach(x => dfs(height+1, x, fn))
-        }
+  def substring(s: Int) = SubString(source, start + s, end, label)
+
+  def substring(s: Int, e: Int) = SubString(source, start + s, start + e, label)
+
+  def head: Char = source(start)
+
+  def commonPrefix(rhs: SubString): SubString = {
+    val len = length min rhs.length
+    for (i <- 0 until len) {
+      if (this (i) != rhs(i)) {
+        return substring(0, i)
       }
     }
-    dfs(0, root, fn)
+    this
   }
 
-  def foreachLeaf(fn: TreeNode => Unit): Unit = {
-    foreachLeaf((node: TreeNode, y: Int) => fn(node))
+  def take(n: Int) = substring(0, n)
+
+  def drop(n: Int) = substring(n, length)
+
+  def mkString = source.substring(start, end)
+
+  override def toString = mkString
+}
+
+class TreeNode {
+
+  lazy val children = new mutable.HashMap[Char, TreeEdge]
+
+  def childEdge(ch: Char): TreeEdge = children(ch)
+
+  def childNode(ch: Char): TreeNode = children(ch).targetNode
+
+  def addChild(str: SubString): Unit = {
+    children += str.head -> TreeEdge(str, new TreeNode)
   }
 
-  def leaves: Array[TreeNode] = {
-    val res = new ArrayBuffer[TreeNode]
-    foreachLeaf(node => res += node)
-    res.toArray
-  }
-
-  def leavesWithHeight: Array[(TreeNode, Int)] = {
-    val res = new ArrayBuffer[(TreeNode, Int)]()
-    foreachLeaf((node, h) => res += node -> h)
-    res.toArray
-  }
-
-  private def indexOfChar(ch: Char): Int = {
-    ch - 'a'
+  def addEdge(edge: TreeEdge): Unit = {
+    children += edge.seq.head -> edge
   }
 }
 
-object SuffixTree {
+case class TreeEdge(var seq: SubString, targetNode: TreeNode) {
 
-  case class StringWithTag(str: String, tag: String)
+  def splitAt(idx: Int): TreeEdge = {
+    val x = TreeEdge(seq.take(idx), new TreeNode())
+    val y = TreeEdge(seq.drop(idx), targetNode)
+    x.targetNode.addEdge(y)
+    x
+  }
+}
 
-  def fromStrings(strs: Iterable[StringWithTag]): SuffixTree = {
-    val tree = new SuffixTree
-    strs.foreach(x => tree.insertAllSuffix(x.str, x.tag))
-    tree
+class SuffixTree {
+  val root = new TreeNode()
+
+  def insert(str: String, label: String): Unit = {
+    val mangled = str + '$'
+
+    for (s <- 0 to mangled.length) {
+      insertSuffix(SubString(mangled, s, mangled.length, label))
+    }
   }
 
-  def fromFile(filename: String): SuffixTree = {
-    throw new UnsupportedOperationException
+  def insertSuffix(origin: SubString): Unit = {
+    var iter = root
+    var sub = origin
+
+    while (sub.nonEmpty) {
+      val ch = sub.head
+
+      if (!iter.children.isDefinedAt(ch)) {
+        iter.addChild(sub)
+        return
+      } else {
+        val edge = iter.children(ch)
+        val cp = edge.seq.commonPrefix(sub)
+
+        if (edge.seq.length - cp.length > 0) {
+          // split origin edge
+          iter.children.update(edge.seq.head, edge.splitAt(cp.length))
+        }
+        sub = sub.drop(cp.length)
+        iter = iter.childNode(ch)
+      }
+    }
   }
+
+  def strings: Array[String] = {
+    val res = new ArrayBuffer[String]
+    val buff = new StringBuffer()
+
+    def dfs(r: TreeNode): Unit = {
+      if (r.children.isEmpty) {
+        res += buff.toString
+      } else {
+        for ((ch, edge) <- r.children) {
+          buff.append(edge.seq)
+          dfs(edge.targetNode)
+          buff.setLength(buff.length - edge.seq.length)
+        }
+      }
+    }
+    dfs(root)
+    res.toArray
+  }
+
 }
