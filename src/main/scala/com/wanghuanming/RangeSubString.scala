@@ -21,14 +21,14 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String) {
 
   def head: Char = source(start)
 
+  def last: Char = source(end-1)
   /**
     * Common prefix but exclude terminal symbol, such as '$'.
     */
   def commonPrefix(rhs: RangeSubString): RangeSubString = {
     val len = length min rhs.length
     for (i <- 0 until len) {
-      // todo: use another char as terminal symbol, instead of '$'
-      if (this (i) != rhs(i) || this (i) == '$') {
+      if (this (i) != rhs(i)) {
         return substring(0, i)
       }
     }

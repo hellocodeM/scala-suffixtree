@@ -10,13 +10,13 @@ object Utils {
     *
     * @return
     */
-  def suffixes(strs: String*): Set[String] = {
+  def suffixes(strs: String*): Array[String] = {
     strs.zipWithIndex.flatMap { case (str: String, i: Int) =>
-      str.tails.map(_ + "$" + i)
-    }.toSet
+      suffixesWithLabel(i.toString, str)
+    }.toArray.sorted
   }
 
-  def suffixesWithTerminal(str: String, terminal: String): Set[String] = {
-    str.tails.map(_ + terminal).toSet
+  def suffixesWithLabel(label: String, str: String): Set[String] = {
+    str.tails.map(label + ":" + _ + "$").toSet
   }
 }

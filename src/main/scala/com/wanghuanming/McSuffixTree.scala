@@ -3,7 +3,6 @@ package com.wanghuanming
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-// todo: identifier for same suffix in different input string
 trait TreeNode {
 
   var seq: RangeSubString
@@ -17,10 +16,14 @@ trait TreeNode {
   def childNode(ch: Char): TreeNode
 
   def addChild(str: RangeSubString): Unit
+
+  def addChild(node: TreeNode): Unit
 }
 
 class LeafNode(override var seq: RangeSubString) extends TreeNode {
 
+  // additional terminal for same leaf node
+  // why not include seq into terminals: seq is variable, it could be changed when split edge, but terminal does not.
   val terminals = new ArrayBuffer[RangeSubString]
 
   override def childNode(ch: Char): TreeNode = {
@@ -28,8 +31,7 @@ class LeafNode(override var seq: RangeSubString) extends TreeNode {
   }
 
   override def addChild(str: RangeSubString): Unit = {
-    assert(str.head == '$')
-    terminals += str
+    throw new IllegalStateException()
   }
 
   override def children: Map[Char, TreeNode] = {
@@ -40,8 +42,16 @@ class LeafNode(override var seq: RangeSubString) extends TreeNode {
     throw new IllegalStateException()
   }
 
+  override def addChild(node: TreeNode): Unit = {
+    throw new IllegalStateException()
+  }
+
   override def toString: String = {
-    s"LeafNode($seq)"
+    s"LeafNode($seq, ${terminals.mkString(",")})"
+  }
+
+  def addTerminal(terminal: RangeSubString): Unit = {
+    terminals += terminal
   }
 }
 
@@ -57,7 +67,7 @@ class BranchNode(override var seq: RangeSubString) extends TreeNode {
     children += str.head -> new LeafNode(str)
   }
 
-  def addChild(node: TreeNode): Unit = {
+  override def addChild(node: TreeNode): Unit = {
     children += node.seq.head -> node
   }
 
@@ -70,32 +80,14 @@ class BranchNode(override var seq: RangeSubString) extends TreeNode {
   }
 }
 
-/*
-// todo: migrate seq to targetNode
-case class TreeEdge(var seq: RangeSubString, targetNode: TreeNode) {
-
-  def splitAt(length: Int): TreeEdge = {
-    val front = TreeEdge(seq.take(length), new BranchNode())
-    val back = TreeEdge(seq.drop(length), targetNode)
-    front.targetNode.addEdge(back)
-    front
-  }
-}
-*/
-
 class McSuffixTree {
 
   val root: TreeNode = new BranchNode(null)
-  private var stringCnt = -1
 
-  private def terminalSymbol: String = {
-    stringCnt = stringCnt + 1
-    "$" + stringCnt
-  }
+  val terminalSymbol = "$"
 
   def insert(str: String, label: String): Unit = {
     // insert all suffixes
-    // todo: insert different terminal symbol for different string
     val S = str + terminalSymbol
     for (s <- 0 to str.length) {
       insertSuffix(RangeSubString(S, s, S.length, label))
@@ -127,24 +119,19 @@ class McSuffixTree {
       if (!iter.hasChild(ch)) {
         iter.addChild(remain)
         remain = remain.drop(remain.length)
-      } else if (ch == '$') {
-        // same string, but with different terminal symbol
-        val leaf = iter.childNode(ch)
-        // todo: use another word instead of addChild
-        leaf.addChild(remain)
-        remain = remain.take(0)
       } else {
         val child = iter.children(ch)
         val cp = child.seq.commonPrefix(remain)
 
-        if (cp.isEmpty) {
-          iter.addChild(remain)
-          remain = remain.take(0)
-        } else if (child.seq.length > cp.length) {
+        if (cp.length < child.seq.length) {
           // split origin child
           iter.updateChild(ch, splitEdgeAt(child, cp.length))
-          remain = remain.drop(cp.length)
+        } else if (cp.length == remain.length) {
+          // remain is the leaf
+          val leaf = child.asInstanceOf[LeafNode]
+          leaf.addTerminal(remain)
         }
+        remain = remain.drop(cp.length)
       }
       iter = iter.childNode(ch)
     }
@@ -154,8 +141,8 @@ class McSuffixTree {
   /**
     * @return originally inserted suffixes.
     */
-  def suffixes: Set[String] = {
-    val res = new mutable.HashSet[String]()
+  def suffixes: Array[String] = {
+    val res = new mutable.ArrayBuffer[String]()
     val buff = new ArrayBuffer[String]()
 
     def dfs(r: TreeNode): Unit = {
@@ -163,9 +150,10 @@ class McSuffixTree {
         case x: LeafNode =>
           // one leaf node contains multi string
           val prefix = buff.init.mkString
-          (x.terminals.map(_.mkString) :+ buff.last).foreach(postfix =>
-            res += prefix + postfix
+          x.terminals.foreach(terminal =>
+            res += terminal.label + ":" + prefix + terminal.mkString
           )
+          res += x.seq.label + ":" + prefix + x.seq
         case _: BranchNode =>
           for ((ch, child) <- r.children) {
             buff += child.seq.mkString
@@ -175,28 +163,6 @@ class McSuffixTree {
       }
     }
     dfs(root)
-    res.toSet
-  }
-
-  def debugDump(): Unit = {
-    val buff = new mutable.ArrayBuffer[String]
-
-    def dfs(r: TreeNode): Unit = {
-      r match {
-        case x: LeafNode =>
-          val prefix = buff.init.mkString
-          (x.terminals.map(_.mkString) :+ buff.last).foreach(postfix =>
-            println(prefix + postfix)
-          )
-        case x: BranchNode =>
-          for ((ch, child) <- r.children) {
-            buff += child.seq.mkString
-            dfs(child)
-            buff.reduceToSize(buff.length - 1)
-          }
-      }
-    }
-
-    dfs(root)
+    res.toArray.sorted
   }
 }

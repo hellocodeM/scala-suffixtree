@@ -13,7 +13,7 @@ class UtilsTest extends FunSuite {
   test("testSuffixes") {
     val str = "hello"
 
-    assert(Utils.suffixes(str) === "hello".tails.map(_ + "$0").toSet)
+    assert(Utils.suffixes(str) === "hello".tails.map("0:" + _ + "$").toArray.sorted)
   }
 
 }
