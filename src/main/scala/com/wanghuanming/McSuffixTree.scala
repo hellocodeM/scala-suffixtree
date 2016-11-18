@@ -89,7 +89,7 @@ class McSuffixTree {
   def insert(str: String, label: String): Unit = {
     // insert all suffixes
     val S = str + terminalSymbol
-    for (s <- 0 to str.length) {
+    for (s <- S.indices) {
       insertSuffix(RangeSubString(S, s, S.length, label))
     }
   }
@@ -165,4 +165,22 @@ class McSuffixTree {
     dfs(root)
     res.toArray.sorted
   }
+}
+
+object McSuffixTree {
+
+  def buildByPrefix(str: String, label: String): Array[McSuffixTree] = {
+    val alphabet = str.distinct
+    val S = str + '$'
+    (alphabet :+ '$').par.map { prefix =>
+      val tree = new McSuffixTree
+      for (i <- S.indices) {
+        if (S(i) == prefix) {
+          tree.insertSuffix(RangeSubString(S, i, S.length, label))
+        }
+      }
+      tree
+    }.toArray
+  }
+
 }

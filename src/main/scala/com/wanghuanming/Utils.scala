@@ -16,7 +16,7 @@ object Utils {
     }.toArray.sorted
   }
 
-  def suffixesWithLabel(label: String, str: String): Set[String] = {
-    str.tails.map(label + ":" + _ + "$").toSet
+  def suffixesWithLabel(label: String, str: String): Array[String] = {
+    str.tails.map(label + ":" + _ + "$").toArray
   }
 }
