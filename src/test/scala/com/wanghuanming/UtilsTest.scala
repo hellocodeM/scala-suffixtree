@@ -11,9 +11,12 @@ import org.scalatest.junit.JUnitRunner
 class UtilsTest extends FunSuite {
 
   test("testSuffixes") {
-    val str = "hello"
+    val str = "test"
+    val label = "0"
 
-    assert(Utils.suffixes(str) === "hello".tails.map("0:" + _ + "$").toArray.sorted)
+    val expected = Array("0:test$", "0:est$", "0:st$", "0:t$").sorted
+    assert(Utils.suffixesWithLabel(label, str) === expected)
+    assert(Utils.suffixes(str) === expected)
   }
 
 }
