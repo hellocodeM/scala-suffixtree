@@ -5,6 +5,7 @@ import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
 
 import scala.collection.mutable
+import scala.io.{BufferedSource, Source}
 import scala.util.Random
 
 /**
@@ -155,5 +156,36 @@ class McSuffixTreeTest extends FunSuite {
     val trees = McSuffixTree.buildByPrefix(str, "1")
 
     assert(trees.flatMap(_.suffixes) === Utils.suffixesWithLabel("1", str))
+  }
+}
+
+@RunWith(classOf[JUnitRunner])
+class ExsetMcSuffixTreeTest extends FunSuite {
+
+  def normalize(input: BufferedSource): String = {
+    input.getLines().mkString
+  }
+
+  def filePath(name: String): String = {
+    val resourceDir = "src/test/resources/exset/"
+    resourceDir + name
+  }
+
+  def expectedResult(name: String): Iterator[String] = {
+    Source.fromFile(filePath(name)).getLines
+  }
+
+  test("ex0") {
+    val input = Array("ex0/1", "ex0/2")
+    val tree = new McSuffixTree
+
+    for (file <- input) {
+      val str = normalize(Source.fromFile(filePath(file)))
+      tree.insert(str, file)
+    }
+
+    tree.suffixes.foreach(println)
+
+    expectedResult("res0").foreach(println)
   }
 }

@@ -145,7 +145,7 @@ class McSuffixTree {
     val res = new mutable.ArrayBuffer[String]()
     val buff = new ArrayBuffer[String]()
 
-    def dfs(r: TreeNode): Unit = {
+    def dfs(r: TreeNode, height: Int): Unit = {
       r match {
         case x: LeafNode =>
           // one leaf node contains multi string
@@ -154,17 +154,24 @@ class McSuffixTree {
             res += terminal.label + ":" + prefix + terminal.mkString
           )
           res += x.seq.label + ":" + prefix + x.seq
+        // todo: normalize leaf representation
         case _: BranchNode =>
           for ((ch, child) <- r.children) {
             buff += child.seq.mkString
-            dfs(child)
+            dfs(child, height + 1)
             buff.reduceToSize(buff.length - 1)
           }
       }
     }
-    dfs(root)
+    dfs(root, 0)
     res.toArray.sorted
   }
+
+}
+
+case class LeafInfo(height: Int, source: String, suffixIdx: Int) {
+
+  override def toString: String = s"$height $source:$suffixIdx"
 }
 
 object McSuffixTree {
