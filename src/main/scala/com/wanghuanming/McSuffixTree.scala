@@ -1,5 +1,8 @@
 package com.wanghuanming
 
+import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -191,4 +194,19 @@ object McSuffixTree {
     }.toArray
   }
 
+  def buildOnSpark(sc: SparkContext, str: String, label: String): RDD[McSuffixTree] = {
+    val alphabet = str.distinct
+    val S = str + '$'
+    val strBV = sc.broadcast(S)
+    sc.parallelize(alphabet).map{ head =>
+      val tree = new McSuffixTree
+      val str = strBV.value
+      for (i <- str.indices) {
+        if (S(i) == head) {
+          tree.insertSuffix(RangeSubString(str, i, str.length, label))
+        }
+      }
+      tree
+    }
+  }
 }

@@ -1,5 +1,6 @@
 package com.wanghuanming
 
+import org.apache.spark.{SparkConf, SparkContext}
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
@@ -187,5 +188,22 @@ class ExsetMcSuffixTreeTest extends FunSuite {
     tree.suffixes.foreach(println)
 
     expectedResult("res0").foreach(println)
+  }
+}
+
+@RunWith(classOf[JUnitRunner])
+class SparkMcSuffixTreeTest extends FunSuite {
+
+  val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")
+  val sc = new SparkContext(conf)
+
+  test("trivial") {
+    val str = "hello world"
+    val trees = McSuffixTree.buildOnSpark(sc, str, "txt1")
+    val suffixes = trees.flatMap{tree =>
+      tree.suffixes
+    }.collect()
+    assert(suffixes.sorted === Utils.suffixesWithLabel("txt1", str))
+    suffixes.foreach(println)
   }
 }

@@ -32,7 +32,7 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String) {
         return substring(0, i)
       }
     }
-    this
+    this.substring(0, len)
   }
 
   def take(n: Int) = substring(0, n)
