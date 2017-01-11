@@ -94,7 +94,7 @@ class McSuffixTree {
     val S = str + terminalSymbol
     for (s <- S.indices.init) {
       // exclude the terminalSymbol
-      insertSuffix(RangeSubString(S, s, S.length, label))
+      insertSuffix(RangeSubString(S, s, S.length, label, s))
     }
   }
 
@@ -145,7 +145,7 @@ class McSuffixTree {
   /**
     * @return originally inserted suffixes.
     */
-  def suffixes: Array[String] = {
+  /*def suffixes: Array[String] = {
     val res = new mutable.ArrayBuffer[String]()
     val buff = new ArrayBuffer[String]()
 
@@ -169,6 +169,31 @@ class McSuffixTree {
     }
     dfs(root, 0)
     res.toArray.sorted
+  }*/
+  def suffixes: Array[String] = {
+    val leaves = new mutable.ArrayBuffer[String]()
+    val buff = new ArrayBuffer[String]()
+
+    def dfs(r: TreeNode, height: Int): Unit = {
+      r match {
+        case x: LeafNode =>
+          // one leaf node contains multi string
+          val prefix = buff.init.mkString
+          x.terminals.foreach(terminal =>
+            //res += terminal.label + ":" + prefix + terminal.mkString
+            leaves += (new LeafInfo(height-1, terminal.label, terminal.index)).toString
+          )
+          leaves += (new LeafInfo(height-1, x.seq.label, x.seq.index)).toString
+        case _: BranchNode =>
+          for ((ch, child) <- r.children) {
+            buff += child.seq.mkString
+            dfs(child, height + 1)
+            buff.reduceToSize(buff.length - 1)
+          }
+      }
+    }
+    dfs(root, 1)
+    leaves.toArray.sorted
   }
 
 }
@@ -187,7 +212,7 @@ object McSuffixTree {
       val tree = new McSuffixTree
       for (i <- S.indices) {
         if (S(i) == prefix) {
-          tree.insertSuffix(RangeSubString(S, i, S.length, label))
+          tree.insertSuffix(RangeSubString(S, i, S.length, label, i))
         }
       }
       tree
@@ -204,7 +229,7 @@ object McSuffixTree {
         val S = str.mkString
         for (i <- S.indices) {
           if (S(i) == head) {
-            tree.insertSuffix(RangeSubString(S, i, S.length, str.label))
+            tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))
           }
         }
       }

@@ -246,6 +246,8 @@ class ExsetSparkMcSuffixTreeTest extends FunSuite {
 
     suffixes.foreach(println)
 
+    println()
+
     expectedResult("res0").foreach(println)
   }
 }

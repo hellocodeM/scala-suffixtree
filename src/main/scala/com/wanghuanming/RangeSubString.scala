@@ -5,7 +5,7 @@ package com.wanghuanming
   * SubString of a long string could be represented as [start, end).
   * Label is used to identify same substring of two different string.
   */
-class RangeSubString(source: String, start: Int, end: Int, val label: String) extends Serializable {
+class RangeSubString(source: String, start: Int, end: Int, val label: String, val index: Int) extends Serializable {
 
   def apply(idx: Int) = source(start + idx)
 
@@ -15,9 +15,9 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String) ex
 
   def nonEmpty = source.nonEmpty && start < end
 
-  def substring(s: Int) = RangeSubString(source, start + s, end, label)
+  def substring(s: Int) = RangeSubString(source, start + s, end, label, index)
 
-  def substring(s: Int, e: Int) = RangeSubString(source, start + s, start + e, label)
+  def substring(s: Int, e: Int) = RangeSubString(source, start + s, start + e, label, index)
 
   def head: Char = source(start)
 
@@ -46,11 +46,11 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String) ex
 
 object RangeSubString {
 
-  def apply(s: String, start: Int, end: Int, label: String): RangeSubString = {
-    new RangeSubString(s, start, end, label)
+  def apply(s: String, start: Int, end: Int, label: String, i: Int): RangeSubString = {
+    new RangeSubString(s, start, end, label, i)
   }
 
   def apply(s: String, label: String = null): RangeSubString = {
-    new RangeSubString(s, 0, s.length, label)
+    new RangeSubString(s, 0, s.length, label, 0)
   }
 }
