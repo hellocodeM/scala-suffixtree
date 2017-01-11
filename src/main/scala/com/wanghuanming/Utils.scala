@@ -1,5 +1,7 @@
 package com.wanghuanming
 
+import scala.collection.mutable.ArrayBuffer
+
 /**
   * Created by ming on 16-11-14.
   */
@@ -10,6 +12,15 @@ object Utils {
     *
     * @return
     */
+
+  def getDistinctStr(strs: ArrayBuffer[RangeSubString]): String = {
+    var res = ""
+    for (str <- strs) {
+      res = (res + str.mkString.init).distinct
+    }
+    res
+  }
+
   def suffixes(strs: String*): Array[String] = {
     strs.zipWithIndex.flatMap { case (str: String, i: Int) =>
       suffixesWithLabel(i.toString, str)

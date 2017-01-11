@@ -194,7 +194,25 @@ object McSuffixTree {
     }.toArray
   }
 
-  def buildOnSpark(sc: SparkContext, str: String, label: String): RDD[McSuffixTree] = {
+  def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString]): RDD[McSuffixTree] = {
+    val alphabet = Utils.getDistinctStr(strs)
+    val strsBV = sc.broadcast(strs)
+    sc.parallelize(alphabet).map{ head =>
+      val tree = new McSuffixTree
+      val tempStr = strsBV.value
+      for (str <- tempStr) {
+        val S = str.mkString
+        for (i <- S.indices) {
+          if (S(i) == head) {
+            tree.insertSuffix(RangeSubString(S, i, S.length, str.label))
+          }
+        }
+      }
+      tree
+    }
+  }
+
+  /*def buildOnSpark(sc: SparkContext, str: String, label: String): RDD[McSuffixTree] = {
     val alphabet = str.distinct
     val S = str + '$'
     val strBV = sc.broadcast(S)
@@ -208,5 +226,6 @@ object McSuffixTree {
       }
       tree
     }
-  }
+  }*/
+
 }
