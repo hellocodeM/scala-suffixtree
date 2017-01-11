@@ -193,7 +193,7 @@ class McSuffixTree {
       }
     }
     dfs(root, 1)
-    leaves.toArray.sorted
+    leaves.toArray
   }
 
 }
@@ -219,9 +219,28 @@ object McSuffixTree {
     }.toArray
   }
 
-  def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString]): RDD[McSuffixTree] = {
+
+  def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): Unit = {
     val alphabet = Utils.getDistinctStr(strs)
     val strsBV = sc.broadcast(strs)
+    val resFileBV = sc.broadcast(resFile)
+    sc.parallelize(alphabet).foreach { head =>
+      val tree = new McSuffixTree
+      val tempStr = strsBV.value
+      for (str <- tempStr) {
+        val S = str.mkString
+        for (i <- S.indices) {
+          if (S(i) == head) {
+            tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))
+          }
+        }
+      }
+      Utils.writeLeafInfoToFile(resFileBV.value + head, tree.suffixes)
+    }
+    /*def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): RDD[McSuffixTree] = {
+    val alphabet = Utils.getDistinctStr(strs)
+    val strsBV = sc.broadcast(strs)
+    val resFileBV = sc.broadcast(resFile)
     sc.parallelize(alphabet).map{ head =>
       val tree = new McSuffixTree
       val tempStr = strsBV.value
@@ -235,9 +254,9 @@ object McSuffixTree {
       }
       tree
     }
-  }
+  }*/
 
-  /*def buildOnSpark(sc: SparkContext, str: String, label: String): RDD[McSuffixTree] = {
+    /*def buildOnSpark(sc: SparkContext, str: String, label: String): RDD[McSuffixTree] = {
     val alphabet = str.distinct
     val S = str + '$'
     val strBV = sc.broadcast(S)
@@ -252,5 +271,5 @@ object McSuffixTree {
       tree
     }
   }*/
-
+  }
 }
