@@ -225,8 +225,7 @@ object McSuffixTree {
     val alphabet = Utils.getDistinctStr(strs)
     val strsBV = sc.broadcast(strs)
     val resFileBV = sc.broadcast(resFile)
-    sc.parallelize(alphabet)
-      .foreach { head =>
+    sc.parallelize(alphabet).foreach{ head =>
       val tree = new McSuffixTree
       val tempStr = strsBV.value
       for (str <- tempStr) {
@@ -237,7 +236,7 @@ object McSuffixTree {
           }
         }
       }
-        Utils.writeLeafInfoToFile(resFileBV.value + System.currentTimeMillis(), tree.suffixes)
+      Utils.writeLeafInfoToFile(resFileBV.value + System.nanoTime(), tree.suffixes)
     }
   }
     /*def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): RDD[McSuffixTree] = {
