@@ -145,7 +145,7 @@ class McSuffixTree {
   /**
     * @return originally inserted suffixes.
     */
-  /*def suffixes: Array[String] = {
+  /*def suffixes4Test: Array[String] = {
     val res = new mutable.ArrayBuffer[String]()
     val buff = new ArrayBuffer[String]()
 
@@ -170,6 +170,7 @@ class McSuffixTree {
     dfs(root, 0)
     res.toArray.sorted
   }*/
+
   def suffixes: Array[String] = {
     val leaves = new mutable.ArrayBuffer[String]()
     val buff = new ArrayBuffer[String]()

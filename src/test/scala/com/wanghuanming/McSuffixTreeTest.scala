@@ -1,5 +1,5 @@
 package com.wanghuanming
-/*
+
 
 import java.io.File
 
@@ -205,12 +205,7 @@ class SparkMcSuffixTreeTest extends FunSuite {
     val str = "hello"
     val strs = new mutable.ArrayBuffer[RangeSubString]
     strs += RangeSubString(str + "$", "txt1")
-    val trees = McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/test")
-    val suffixes = trees.flatMap{tree =>
-      tree.suffixes
-    }.collect()
-    assert(suffixes.sorted === Utils.suffixesWithLabel("txt1", str))
-    suffixes.foreach(println)
+    McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/")
   }
 }
 
@@ -240,17 +235,9 @@ class ExsetSparkMcSuffixTreeTest extends FunSuite {
       strs += RangeSubString(str + "$", file.getName)
     }
 
-    val trees = McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/test")
-    val suffixes = trees.flatMap{tree =>
-      tree.suffixes
-    }.collect()
-
-    suffixes.foreach(println)
-
-    println()
+    McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/")
 
     expectedResult("res0").foreach(println)
   }
 }
 
-*/

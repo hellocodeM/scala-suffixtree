@@ -41,7 +41,9 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
 
   def mkString = source.substring(start, end)
 
-  override def toString = mkString
+  override def toString = s"$source $start $end $label $index"
+
+//  override def toString = mkString
 }
 
 object RangeSubString {

@@ -2,6 +2,8 @@ package com.wanghuanming
 
 import java.io.{File, PrintWriter}
 
+import org.apache.spark.SparkContext
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.{BufferedSource, Source}
@@ -17,6 +19,7 @@ object Utils {
     input.getLines().mkString
   }
 
+
   def readAllStringFromFile(filePath: String): mutable.ArrayBuffer[RangeSubString] = {
     val strs = new mutable.ArrayBuffer[RangeSubString]
     val dir = new File(filePath)
@@ -27,7 +30,25 @@ object Utils {
     strs
   }
 
+  def readAllStringFromFile(sc: SparkContext, filePath: String): mutable.ArrayBuffer[RangeSubString] = {
+    val strs = new mutable.ArrayBuffer[RangeSubString]
+    val strsRdd = sc.wholeTextFiles(filePath)
+        .map(x => (x._1.substring(x._1.lastIndexOf("/")+1), x._2.replace("\n", "")))
+      .collect()
+
+    for (file <- strsRdd)
+      strs += RangeSubString(file._2 + "$", file._1)
+
+    strs
+  }
+
   def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
+    val writer = new PrintWriter(new File(filePath))
+    suffixes.foreach(writer.println)
+    writer.close()
+  }
+
+  def writeLeafInfoToFile(sc: SparkContext, filePath: String, suffixes: Array[String]): Unit = {
     val writer = new PrintWriter(new File(filePath))
     suffixes.foreach(writer.println)
     writer.close()
