@@ -28,4 +28,8 @@ class UtilsTest extends FunSuite {
     Utils.readAllStringFromFile(sc, "src/test/resources/exset/ex0").foreach(println)
   }
 
+  test("writeToHdfs") {
+    val arr = Array("adasdsa", "sadsadsa", "Sads")
+    Utils.writeLeafInfoToFile("src/test/resources/result/part-", arr)
+  }
 }

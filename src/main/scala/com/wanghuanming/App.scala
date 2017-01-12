@@ -10,14 +10,15 @@ object App {
   
   def main(args : Array[String]) {
     val arg = new Array[String](3)
-    arg(0) = "src/test/resources/exset/ex0"
-    arg(1) = "src/test/resources/result/part-"
+    arg(0) = "src/test/resources/exset/ex3"
+    arg(1) = "src/test/resources/result/"
     arg(2) = "src/test/resources/temp/"
     val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")
     val sc = new SparkContext(conf)
 
     val strs = Utils.readAllStringFromFile(sc, arg(0))
-    McSuffixTree.buildOnSpark(sc, strs, arg(1))
+    McSuffixTree.buildOnSpark(sc, strs, arg(1) + "part-")
+
   }
 
 }

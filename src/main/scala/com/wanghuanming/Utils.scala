@@ -2,7 +2,10 @@ package com.wanghuanming
 
 import java.io.{File, PrintWriter}
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -12,8 +15,6 @@ import scala.io.{BufferedSource, Source}
   * Created by ming on 16-11-14.
   */
 object Utils {
-
-
 
   def normalize(input: BufferedSource): String = {
     input.getLines().mkString
@@ -42,16 +43,17 @@ object Utils {
     strs
   }
 
-  def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
+  def writeLeafInfoToLocalFile(filePath: String, suffixes: Array[String]): Unit = {
     val writer = new PrintWriter(new File(filePath))
     suffixes.foreach(writer.println)
     writer.close()
   }
 
-  def writeLeafInfoToFile(sc: SparkContext, filePath: String, suffixes: Array[String]): Unit = {
-    val writer = new PrintWriter(new File(filePath))
+  def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
+    val fs = FileSystem.get(new Configuration())
+    val writer = new PrintWriter(fs.create(new Path(filePath)))
     suffixes.foreach(writer.println)
-    writer.close()
+    writer.close
   }
 
 
