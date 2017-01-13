@@ -10,7 +10,7 @@ object App {
   
   def main(args : Array[String]) {
     val arg = new Array[String](3)
-    arg(0) = "src/test/resources/exset/ex0"
+    arg(0) = "src/test/resources/exset/5000 1000"
     arg(1) = "src/test/resources/result/"
     arg(2) = "src/test/resources/temp/"
     val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")

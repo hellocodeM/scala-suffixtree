@@ -87,16 +87,14 @@ class McSuffixTree {
 
   val root: TreeNode = new BranchNode(null)
 
-  val terminalSymbol = "$"
-
-  def insert(str: String, label: String): Unit = {
+  /*def insert(str: String, label: String): Unit = {
     // insert all suffixes
     val S = str + terminalSymbol
     for (s <- S.indices.init) {
       // exclude the terminalSymbol
       insertSuffix(RangeSubString(S, s, S.length, label, s))
     }
-  }
+  }*/
 
   /**
     * r =seq=> origin
@@ -223,13 +221,14 @@ object McSuffixTree {
 
   def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): Unit = {
     val alphabet = Utils.getDistinctStr(strs)
+    val terminalSymbolBV = sc.broadcast(Utils.getUniqueTerminalSymbol(alphabet, 500))
     val strsBV = sc.broadcast(strs)
     val resFileBV = sc.broadcast(resFile)
     sc.parallelize(alphabet).foreach{ head =>
       val tree = new McSuffixTree
       val tempStr = strsBV.value
       for (str <- tempStr) {
-        val S = str.mkString
+        val S = str.mkString + terminalSymbolBV.value
         for (i <- S.indices) {
           if (S(i) == head) {
             tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))

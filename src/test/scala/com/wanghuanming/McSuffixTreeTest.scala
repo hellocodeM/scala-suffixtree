@@ -1,4 +1,5 @@
 package com.wanghuanming
+/*
 
 
 import java.io.File
@@ -241,3 +242,4 @@ class ExsetSparkMcSuffixTreeTest extends FunSuite {
   }
 }
 
+*/

@@ -38,7 +38,7 @@ object Utils {
       .collect()
 
     for (file <- strsRdd)
-      strs += RangeSubString(file._2 + "$", file._1)
+      strs += RangeSubString(file._2, file._1)
 
     strs
   }
@@ -60,9 +60,17 @@ object Utils {
   def getDistinctStr(strs: ArrayBuffer[RangeSubString]): String = {
     var res = ""
     for (str <- strs) {
-      res = (res + str.mkString.init).distinct
+      res = (res + str.mkString).distinct
     }
     res
+  }
+
+  def getUniqueTerminalSymbol(strs: String, terminalSymbol: Int): Char = {
+    var res = terminalSymbol
+    while (strs.contains(res.toChar)) {
+      res += 1
+    }
+    res.toChar
   }
 
   /**
