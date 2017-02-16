@@ -9,15 +9,11 @@ import org.apache.spark.{SparkConf, SparkContext}
 object App {
   
   def main(args : Array[String]) {
-    val arg = new Array[String](3)
-    arg(0) = "src/test/resources/exset/5000 1000"
-    arg(1) = "src/test/resources/result/"
-    arg(2) = "src/test/resources/temp/"
-    val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")
+    val conf = new SparkConf().setAppName("McSuffixTree")
     val sc = new SparkContext(conf)
 
-    val strs = Utils.readAllStringFromFile(sc, arg(0))
-    McSuffixTree.buildOnSpark(sc, strs, arg(1) + "part-")
+    val strs = Utils.readAllStringFromFile(sc, args(0))
+    McSuffixTree.buildOnSpark(sc, strs, args(1) + "part-")
 
   }
 
