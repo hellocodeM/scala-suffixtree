@@ -52,9 +52,9 @@ object Utils {
   }
 
   def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
-    val regex = new Regex("hdfs://(.*)[:][0-9]{1,}[/]")
-    val hdfsUrl = regex.findFirstIn(filePath).toList
-    val fs = FileSystem.get(URI.create(hdfsUrl(0).init), new Configuration())
+    val hdfsUrl = URI.create(filePath)
+    val fs = FileSystem.get(URI.create("hdfs://" + hdfsUrl.getAuthority), new Configuration())
+
     val writer = new PrintWriter(fs.create(new Path(filePath)))
     suffixes.foreach(writer.println)
     writer.close
