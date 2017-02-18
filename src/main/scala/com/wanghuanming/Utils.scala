@@ -11,6 +11,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.{BufferedSource, Source}
+import scala.util.matching.Regex
 
 /**
   * Created by ming on 16-11-14.
@@ -51,7 +52,9 @@ object Utils {
   }
 
   def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
-    val fs = FileSystem.get(URI.create("hdfs://Master:9000"), new Configuration())
+    val regex = new Regex("hdfs://(.*)[:][0-9]{1,}[/]")
+    val hdfsUrl = regex.findFirstIn(filePath).toList
+    val fs = FileSystem.get(URI.create(hdfsUrl(0).init), new Configuration())
     val writer = new PrintWriter(fs.create(new Path(filePath)))
     suffixes.foreach(writer.println)
     writer.close
