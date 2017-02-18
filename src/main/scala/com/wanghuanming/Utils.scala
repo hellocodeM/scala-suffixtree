@@ -1,6 +1,7 @@
 package com.wanghuanming
 
 import java.io.{File, PrintWriter}
+import java.net.URI
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
@@ -50,7 +51,7 @@ object Utils {
   }
 
   def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
-    val fs = FileSystem.get(new Configuration())
+    val fs = FileSystem.get(URI.create("hdfs://Master:9000"), new Configuration())
     val writer = new PrintWriter(fs.create(new Path(filePath)))
     suffixes.foreach(writer.println)
     writer.close

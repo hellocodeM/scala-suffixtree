@@ -9,7 +9,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 object App {
   
   def main(args : Array[String]) {
-    val conf = new SparkConf().setAppName("McSuffixTree")
+    val conf = new SparkConf().setAppName("GST")
     val sc = new SparkContext(conf)
 
     val strs = Utils.readAllStringFromFile(sc, args(0))
