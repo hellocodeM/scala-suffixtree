@@ -1,4 +1,4 @@
-package com.hazza
+package com.wanghuanming
 
 /**
   * Created by ming on 16-11-12.
@@ -41,9 +41,9 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
 
   def mkString = source.substring(start, end)
 
-  override def toString = s"$source $start $end $label $index"
+//  override def toString = s"$source $start $end $label $index"
 
-//  override def toString = mkString
+  override def toString = mkString  //测试用
 }
 
 object RangeSubString {

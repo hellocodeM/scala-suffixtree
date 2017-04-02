@@ -94,7 +94,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.hazza.App</mainClass>
+                            <mainClass>com.wanghuanming.App</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

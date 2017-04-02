@@ -1,4 +1,4 @@
-package com.hazza
+package com.wanghuanming
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -195,6 +195,39 @@ class McSuffixTree {
     }
     dfs(root, 1)
     leaves.toArray
+  }
+
+  /**
+    * 为了方便测试的输出模式
+    * @return
+    */
+  def suffixesTest: Array[String] = {
+    val res = new mutable.ArrayBuffer[String]()
+    val buff = new ArrayBuffer[String]()
+
+    def dfs(r: TreeNode, height: Int): Unit = {
+      r match {
+        case x: LeafNode =>
+          // one leaf node contains multi string
+          val prefix = buff.init.mkString
+          x.terminals.foreach { terminal =>
+            res += terminal.label + ":" + prefix + terminal.mkString
+          }
+          res += x.seq.label + ":" + prefix + x.seq
+          /*res += x.seq.label + ":" + prefix + x.seq.toString.substring(0, x.seq.toString.indexOf(" "))
+          println("x.seq: " + x.seq.toString.substring(0, x.seq.toString.indexOf(" ")))
+          println("start: " + x.seq.toString.indexOf(" "))*/
+        // todo: normalize leaf representation
+        case _: BranchNode =>
+          for ((ch, child) <- r.children) {
+            buff += child.seq.mkString
+            dfs(child, height + 1)
+            buff.reduceToSize(buff.length - 1)
+          }
+      }
+    }
+    dfs(root, 0)
+    res.toArray.sorted
   }
 
 }

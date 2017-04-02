@@ -1,4 +1,4 @@
-package com.hazza
+package com.wanghuanming
 
 
 
@@ -26,7 +26,7 @@ class McSuffixTreeTest extends FunSuite {
     val tree = new McSuffixTree
     tree.insertSuffix(RangeSubString("hello", "1"))
 
-    assert(tree.suffixes === Array("1:hello"))
+    assert(tree.suffixesTest === Array("1:hello"))
   }
 
   test("branch") {
@@ -34,7 +34,7 @@ class McSuffixTreeTest extends FunSuite {
     tree.insertSuffix(RangeSubString("LLO$", "1"))
     tree.insertSuffix(RangeSubString("LO$", "2"))
 
-    assert(tree.suffixes === Array("1:LLO$", "2:LO$"))
+    assert(tree.suffixesTest === Array("1:LLO$", "2:LO$"))
   }
 
   test("same suffix") {
@@ -42,7 +42,7 @@ class McSuffixTreeTest extends FunSuite {
     tree.insertSuffix(RangeSubString("LL0$", "1"))
     tree.insertSuffix(RangeSubString("LL0$", "2"))
 
-    assert(tree.suffixes === Array("1:LL0$", "2:LL0$"))
+    assert(tree.suffixesTest === Array("1:LL0$", "2:LL0$"))
   }
 
   def testInsertForStrings(strings: scala.collection.IndexedSeq[String]): Unit = {
@@ -52,7 +52,7 @@ class McSuffixTreeTest extends FunSuite {
       tree.insert(strings(i), i.toString)
     }
 
-    assert(tree.suffixes === Utils.suffixes(strings: _*))
+    assert(tree.suffixesTest === Utils.suffixes(strings: _*))
   }
 
   test("single string") {
@@ -113,7 +113,7 @@ class McSuffixTreeTest extends FunSuite {
       strings ++= Utils.suffixesWithLabel(i.toString, str)
     }
 
-    assert(tree.suffixes === strings.sorted, sources)
+    assert(tree.suffixesTest === strings.sorted, sources)
   }
 
   test("insert many randomly short string") {
@@ -130,7 +130,7 @@ class McSuffixTreeTest extends FunSuite {
       strings ++= Utils.suffixesWithLabel(i.toString, str)
     }
 
-    val res = tree.suffixes
+    val res = tree.suffixesTest
     val expected = strings.sorted
     val diff = (res diff expected) ++ (expected diff res)
 
@@ -156,14 +156,14 @@ class McSuffixTreeTest extends FunSuite {
       strings ++= Utils.suffixesWithLabel(i.toString, str)
     }
 
-    assert(tree.suffixes === strings.sorted)
+    assert(tree.suffixesTest === strings.sorted)
   }
 
   test("buildByPrefix") {
     val str = "hello"
     val trees = McSuffixTree.buildByPrefix(str, "1")
 
-    assert(trees.flatMap(_.suffixes).sorted === Utils.suffixesWithLabel("1", str))
+    assert(trees.flatMap(_.suffixesTest).sorted === Utils.suffixesWithLabel("1", str))
   }
 }
 
