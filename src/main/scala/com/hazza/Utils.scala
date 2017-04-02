@@ -1,4 +1,4 @@
-package com.wanghuanming
+package com.hazza
 
 import java.io.{File, PrintWriter}
 import java.net.URI

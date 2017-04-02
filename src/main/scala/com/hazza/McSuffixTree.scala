@@ -1,4 +1,4 @@
-package com.wanghuanming
+package com.hazza
 
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
@@ -87,14 +87,16 @@ class McSuffixTree {
 
   val root: TreeNode = new BranchNode(null)
 
-  /*def insert(str: String, label: String): Unit = {
+  val terminalSymbol = "$"
+
+  def insert(str: String, label: String): Unit = {
     // insert all suffixes
     val S = str + terminalSymbol
     for (s <- S.indices.init) {
       // exclude the terminalSymbol
       insertSuffix(RangeSubString(S, s, S.length, label, s))
     }
-  }*/
+  }
 
   /**
     * r =seq=> origin

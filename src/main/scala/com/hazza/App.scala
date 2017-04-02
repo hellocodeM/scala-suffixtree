@@ -1,4 +1,4 @@
-package com.wanghuanming
+package com.hazza
 
 import org.apache.spark.{SparkConf, SparkContext}
 

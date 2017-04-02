@@ -1,4 +1,4 @@
-package com.wanghuanming
+package com.hazza
 
 /**
   * Created by ming on 16-11-12.
