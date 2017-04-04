@@ -22,14 +22,4 @@ class UtilsTest extends FunSuite {
     assert(Utils.suffixes(str) === expected)
   }
 
-  /*test("readFromHdfs") {
-    Utils.readAllStringFromFile("src/test/resources/exset/ex0").foreach(println)
-    println()
-    Utils.readAllStringFromFile(sc, "src/test/resources/exset/ex0").foreach(println)
-  }*/
-
-  /*test("writeToHdfs") {
-    val arr = Array("adasdsa", "sadsadsa", "Sads")
-    Utils.writeLeafInfoToFile("src/test/resources/result/part-", arr)
-  }*/
 }

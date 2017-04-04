@@ -13,8 +13,7 @@ object App {
     val sc = new SparkContext(conf)
 
     val strs = Utils.readAllStringFromFile(sc, args(0))
-    McSuffixTree.buildOnSpark(sc, strs, args(1) + "part-")
-
+    McSuffixTree.buildOnSpark(sc, strs, args(1)  + "/part-")
   }
 
 }

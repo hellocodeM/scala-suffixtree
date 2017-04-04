@@ -1,12 +1,8 @@
 package com.wanghuanming
 
 
-
-
-
 import java.io.File
 
-import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
@@ -116,6 +112,10 @@ class McSuffixTreeTest extends FunSuite {
     assert(tree.suffixesTest === strings.sorted, sources)
   }
 
+  test("specific case") {
+    testInsertForStrings(Array("rM6pXM9Osb", "QZW8xI04sU", "rM6pXM9Osb", "QZW8xI04sU"))
+  }
+
   test("insert many randomly short string") {
     val n = 100
     val size = 10
@@ -174,13 +174,13 @@ class ExsetMcSuffixTreeTest extends FunSuite {
     input.getLines().mkString
   }
 
+  def expectedResult(name: String): Iterator[String] = {
+    Source.fromFile(filePath(name)).getLines
+  }
+
   def filePath(name: String): String = {
     val resourceDir = "src/test/resources/exset/"
     resourceDir + name
-  }
-
-  def expectedResult(name: String): Iterator[String] = {
-    Source.fromFile(filePath(name)).getLines
   }
 
   test("ex0") {
@@ -207,7 +207,7 @@ class SparkMcSuffixTreeTest extends FunSuite {
   test("trivial") {
     val str = "hello"
     val strs = new mutable.ArrayBuffer[RangeSubString]
-    strs += RangeSubString(str + "$", "txt1")
+    strs += RangeSubString(str, "txt1")
     McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/")
   }
 }
@@ -222,19 +222,19 @@ class ExsetSparkMcSuffixTreeTest extends FunSuite {
     input.getLines().mkString
   }
 
-  def filePath(name: String): String = {
-    resourceDir + name
-  }
-
   def expectedResult(name: String): Iterator[String] = {
     Source.fromFile(filePath(name)).getLines
+  }
+
+  def filePath(name: String): String = {
+    resourceDir + name
   }
 
   test("ex0") {
     val dir = new File(resourceDir + "ex3")
 
     for (file <- dir.listFiles) {
-      val str:String = normalize(Source.fromFile(file))
+      val str: String = normalize(Source.fromFile(file))
       strs += RangeSubString(str + "$", file.getName)
     }
 

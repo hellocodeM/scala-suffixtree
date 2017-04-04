@@ -6,37 +6,34 @@ import java.net.URI
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.io.{BufferedSource, Source}
-import scala.util.matching.Regex
 
 /**
   * Created by ming on 16-11-14.
   */
 object Utils {
 
-  def normalize(input: BufferedSource): String = {
-    input.getLines().mkString
-  }
-
-
   def readAllStringFromFile(filePath: String): mutable.ArrayBuffer[RangeSubString] = {
     val strs = new mutable.ArrayBuffer[RangeSubString]
     val dir = new File(filePath)
     for (file <- dir.listFiles) {
-      val str:String = Utils.normalize(Source.fromFile(file))
+      val str: String = Utils.normalize(Source.fromFile(file))
       strs += RangeSubString(str + "$", file.getName)
     }
     strs
   }
 
+  def normalize(input: BufferedSource): String = {
+    input.getLines().mkString
+  }
+
   def readAllStringFromFile(sc: SparkContext, filePath: String): mutable.ArrayBuffer[RangeSubString] = {
     val strs = new mutable.ArrayBuffer[RangeSubString]
     val strsRdd = sc.wholeTextFiles(filePath)
-        .map(x => (x._1.substring(x._1.lastIndexOf("/")+1), x._2.replace("\n", "")))
+      .map(x => (x._1.substring(x._1.lastIndexOf("/") + 1), x._2.replace("\n", "")))
       .collect()
 
     for (file <- strsRdd)

@@ -1,7 +1,6 @@
 package com.wanghuanming
 
 import org.apache.spark.SparkContext
-import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -83,11 +82,9 @@ class BranchNode(override var seq: RangeSubString) extends TreeNode {
   }
 }
 
-class McSuffixTree {
+class McSuffixTree(terminalSymbol: String = "$") {
 
   val root: TreeNode = new BranchNode(null)
-
-  val terminalSymbol = "$"
 
   def insert(str: String, label: String): Unit = {
     // insert all suffixes
@@ -97,21 +94,6 @@ class McSuffixTree {
       insertSuffix(RangeSubString(S, s, S.length, label, s))
     }
   }
-
-  /**
-    * r =seq=> origin
-    *
-    * r =front=> middle =end=> origin
-    */
-  private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
-    val front = origin.seq.take(length)
-    val back = origin.seq.drop(length)
-    val middle = new BranchNode(front)
-    origin.seq = back
-    middle.addChild(origin)
-    middle
-  }
-
 
   def insertSuffix(origin: RangeSubString): Unit = {
     var iter = root
@@ -141,35 +123,19 @@ class McSuffixTree {
     }
   }
 
-
   /**
-    * @return originally inserted suffixes.
+    * r =seq=> origin
+    *
+    * r =front=> middle =end=> origin
     */
-  /*def suffixes4Test: Array[String] = {
-    val res = new mutable.ArrayBuffer[String]()
-    val buff = new ArrayBuffer[String]()
-
-    def dfs(r: TreeNode, height: Int): Unit = {
-      r match {
-        case x: LeafNode =>
-          // one leaf node contains multi string
-          val prefix = buff.init.mkString
-          x.terminals.foreach(terminal =>
-            res += terminal.label + ":" + prefix + terminal.mkString
-          )
-          res += x.seq.label + ":" + prefix + x.seq
-        // todo: normalize leaf representation
-        case _: BranchNode =>
-          for ((ch, child) <- r.children) {
-            buff += child.seq.mkString
-            dfs(child, height + 1)
-            buff.reduceToSize(buff.length - 1)
-          }
-      }
-    }
-    dfs(root, 0)
-    res.toArray.sorted
-  }*/
+  private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
+    val front = origin.seq.take(length)
+    val back = origin.seq.drop(length)
+    val middle = new BranchNode(front)
+    origin.seq = back
+    middle.addChild(origin)
+    middle
+  }
 
   def suffixes: Array[String] = {
     val leaves = new mutable.ArrayBuffer[String]()
@@ -182,9 +148,9 @@ class McSuffixTree {
           val prefix = buff.init.mkString
           x.terminals.foreach(terminal =>
             //res += terminal.label + ":" + prefix + terminal.mkString
-            leaves += (new LeafInfo(height-1, terminal.label, terminal.index)).toString
+            leaves += (new LeafInfo(height - 1, terminal.label, terminal.index)).toString
           )
-          leaves += (new LeafInfo(height-1, x.seq.label, x.seq.index)).toString
+          leaves += (new LeafInfo(height - 1, x.seq.label, x.seq.index)).toString
         case _: BranchNode =>
           for ((ch, child) <- r.children) {
             buff += child.seq.mkString
@@ -193,12 +159,14 @@ class McSuffixTree {
           }
       }
     }
+
     dfs(root, 1)
     leaves.toArray
   }
 
   /**
     * 为了方便测试的输出模式
+    *
     * @return
     */
   def suffixesTest: Array[String] = {
@@ -214,9 +182,9 @@ class McSuffixTree {
             res += terminal.label + ":" + prefix + terminal.mkString
           }
           res += x.seq.label + ":" + prefix + x.seq
-          /*res += x.seq.label + ":" + prefix + x.seq.toString.substring(0, x.seq.toString.indexOf(" "))
-          println("x.seq: " + x.seq.toString.substring(0, x.seq.toString.indexOf(" ")))
-          println("start: " + x.seq.toString.indexOf(" "))*/
+        /*res += x.seq.label + ":" + prefix + x.seq.toString.substring(0, x.seq.toString.indexOf(" "))
+        println("x.seq: " + x.seq.toString.substring(0, x.seq.toString.indexOf(" ")))
+        println("start: " + x.seq.toString.indexOf(" "))*/
         // todo: normalize leaf representation
         case _: BranchNode =>
           for ((ch, child) <- r.children) {
@@ -226,6 +194,7 @@ class McSuffixTree {
           }
       }
     }
+
     dfs(root, 0)
     res.toArray.sorted
   }
@@ -241,9 +210,10 @@ object McSuffixTree {
 
   def buildByPrefix(str: String, label: String): Array[McSuffixTree] = {
     val alphabet = str.distinct
-    val S = str + '$'
+    val terminal = "$"
+    val S = str + terminal
     alphabet.par.map { prefix =>
-      val tree = new McSuffixTree
+      val tree = new McSuffixTree(terminal)
       for (i <- S.indices) {
         if (S(i) == prefix) {
           tree.insertSuffix(RangeSubString(S, i, S.length, label, i))
@@ -256,16 +226,20 @@ object McSuffixTree {
 
   def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): Unit = {
     val alphabet = Utils.getDistinctStr(strs)
-    val terminalSymbolBV = sc.broadcast(Utils.getUniqueTerminalSymbol(alphabet, 500))
+    val terminalSymbol = Utils.getUniqueTerminalSymbol(alphabet, 500).toString
     val strsBV = sc.broadcast(strs)
     val resFileBV = sc.broadcast(resFile)
-    sc.parallelize(alphabet).foreach{ head =>
-      val tree = new McSuffixTree
+    val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x))
+
+    sc.parallelize(prefixes, 1024).foreach { head =>
+      val tree = new McSuffixTree(terminalSymbol)
       val tempStr = strsBV.value
+      val prefix = head._1.toString + head._2
+
       for (str <- tempStr) {
-        val S = str.mkString + terminalSymbolBV.value
+        val S = str.mkString + terminalSymbol
         for (i <- S.indices) {
-          if (S(i) == head) {
+          if (S.startsWith(prefix, i)) {
             tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))
           }
         }
@@ -273,39 +247,6 @@ object McSuffixTree {
       Utils.writeLeafInfoToFile(resFileBV.value + System.nanoTime(), tree.suffixes)
     }
   }
-    /*def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): RDD[McSuffixTree] = {
-    val alphabet = Utils.getDistinctStr(strs)
-    val strsBV = sc.broadcast(strs)
-    val resFileBV = sc.broadcast(resFile)
-    sc.parallelize(alphabet).map{ head =>
-      val tree = new McSuffixTree
-      val tempStr = strsBV.value
-      for (str <- tempStr) {
-        val S = str.mkString
-        for (i <- S.indices) {
-          if (S(i) == head) {
-            tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))
-          }
-        }
-      }
-      tree
-    }
-  }*/
 
-    /*def buildOnSpark(sc: SparkContext, str: String, label: String): RDD[McSuffixTree] = {
-    val alphabet = str.distinct
-    val S = str + '$'
-    val strBV = sc.broadcast(S)
-    sc.parallelize(alphabet).map{ head =>
-      val tree = new McSuffixTree
-      val str = strBV.value
-      for (i <- str.indices) {
-        if (S(i) == head) {
-          tree.insertSuffix(RangeSubString(str, i, str.length, label))
-        }
-      }
-      tree
-    }
-  }*/
 
 }

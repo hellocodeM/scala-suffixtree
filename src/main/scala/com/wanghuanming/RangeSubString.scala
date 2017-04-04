@@ -9,19 +9,16 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
 
   def apply(idx: Int) = source(start + idx)
 
-  def length = end - start
-
   def isEmpty = source.isEmpty || start >= end
 
   def nonEmpty = source.nonEmpty && start < end
 
   def substring(s: Int) = RangeSubString(source, start + s, end, label, index)
 
-  def substring(s: Int, e: Int) = RangeSubString(source, start + s, start + e, label, index)
-
   def head: Char = source(start)
 
-  def last: Char = source(end-1)
+  def last: Char = source(end - 1)
+
   /**
     * Common prefix but exclude terminal symbol, such as '$'.
     */
@@ -35,15 +32,19 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
     this.substring(0, len)
   }
 
+  def length = end - start
+
+  def substring(s: Int, e: Int) = RangeSubString(source, start + s, start + e, label, index)
+
   def take(n: Int) = substring(0, n)
 
   def drop(n: Int) = substring(n, length)
 
+  override def toString = mkString //测试用
+
+  //  override def toString = s"$source $start $end $label $index"
+
   def mkString = source.substring(start, end)
-
-//  override def toString = s"$source $start $end $label $index"
-
-  override def toString = mkString  //测试用
 }
 
 object RangeSubString {
