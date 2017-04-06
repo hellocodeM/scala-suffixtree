@@ -149,9 +149,9 @@ class McSuffixTree(terminalSymbol: String = "$") {
           val prefix = buff.init.mkString
           x.terminals.foreach(terminal =>
             //res += terminal.label + ":" + prefix + terminal.mkString
-            leaves += (new LeafInfo(height - 1, terminal.label, terminal.index)).toString
+            leaves += LeafInfo(height - 1, terminal.label, terminal.index).toString
           )
-          leaves += (new LeafInfo(height - 1, x.seq.label, x.seq.index)).toString
+          leaves += LeafInfo(height - 1, x.seq.label, x.seq.index).toString
         case _: BranchNode =>
           for ((ch, child) <- r.children) {
             buff += child.seq.mkString
@@ -183,9 +183,6 @@ class McSuffixTree(terminalSymbol: String = "$") {
             res += terminal.label + ":" + prefix + terminal.mkString
           }
           res += x.seq.label + ":" + prefix + x.seq
-        /*res += x.seq.label + ":" + prefix + x.seq.toString.substring(0, x.seq.toString.indexOf(" "))
-        println("x.seq: " + x.seq.toString.substring(0, x.seq.toString.indexOf(" ")))
-        println("start: " + x.seq.toString.indexOf(" "))*/
         // todo: normalize leaf representation
         case _: BranchNode =>
           for ((ch, child) <- r.children) {
@@ -246,11 +243,10 @@ object McSuffixTree {
     }
   }
 
-
   def buildOnSpark(sc: SparkContext, strs: Iterable[RangeSubString]): RDD[McSuffixTree] = {
-    val alphabet = Utils.getDistinctStr(strs)
+    val alphabet = Utils.getAlphabet(strs)
     val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x)).map(x => x._1.toString + x._2)
-    val terminal = Utils.getUniqueTerminalSymbol(alphabet, 500).toString
+    val terminal = Utils.genTerminal(alphabet).toString
 
     buildOnSpark(sc, strs, terminal, alphabet, prefixes)
   }

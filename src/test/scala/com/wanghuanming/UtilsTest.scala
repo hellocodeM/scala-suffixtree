@@ -4,13 +4,15 @@ import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
 
+import scala.util.Random
+
 /**
   * Created by ming on 16-11-17.
   */
 @RunWith(classOf[JUnitRunner])
 class UtilsTest extends FunSuite {
 
-  test("testSuffixes") {
+  test("suffixes") {
     val str = "test"
     val label = "0"
 
@@ -19,4 +21,21 @@ class UtilsTest extends FunSuite {
     assert(Utils.suffixes(str) === expected)
   }
 
+  test("getAlphabet") {
+    val strs = Iterable(RangeSubString("hello"))
+    val alphabet = Utils.getAlphabet(strs)
+
+    assert("helo".sorted === alphabet.sorted)
+  }
+
+  def assertTerminal(str: String) = {
+    val terminal = Utils.genTerminal(str)
+    assert(!str.contains(terminal))
+  }
+
+  test("genTerminal") {
+    for (i <- 1 to 100) {
+      assertTerminal(Random.nextString(100))
+    }
+  }
 }

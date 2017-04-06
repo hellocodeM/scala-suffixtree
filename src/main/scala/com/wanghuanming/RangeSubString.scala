@@ -34,7 +34,10 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
 
   def length = end - start
 
-  def substring(s: Int, e: Int) = RangeSubString(source, start + s, start + e, label, index)
+  def substring(s: Int, e: Int) = {
+    assert(s <= e)
+    RangeSubString(source, start + s, start + e, label, index)
+  }
 
   def take(n: Int) = substring(0, n)
 

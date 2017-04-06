@@ -1,38 +1,20 @@
 package com.wanghuanming
 
-import java.io.{File, PrintWriter}
-import java.net.URI
+import java.io.File
 
-import org.apache.hadoop.conf.Configuration
-import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 
 import scala.collection.mutable
-import scala.io.{BufferedSource, Source}
 
 /**
   * Created by ming on 16-11-14.
   */
 object Utils {
 
-  def readAllStringFromFile(filePath: String): mutable.ArrayBuffer[RangeSubString] = {
+  def readFromHDFS(sc: SparkContext, filePath: String): mutable.ArrayBuffer[RangeSubString] = {
     val strs = new mutable.ArrayBuffer[RangeSubString]
-    val dir = new File(filePath)
-    for (file <- dir.listFiles) {
-      val str: String = Utils.normalize(Source.fromFile(file))
-      strs += RangeSubString(str + "$", file.getName)
-    }
-    strs
-  }
-
-  def normalize(input: BufferedSource): String = {
-    input.getLines().mkString
-  }
-
-  def readAllStringFromFile(sc: SparkContext, filePath: String): mutable.ArrayBuffer[RangeSubString] = {
-    val strs = new mutable.ArrayBuffer[RangeSubString]
-    val strsRdd = sc.wholeTextFiles(filePath)
-      .map(x => (x._1.substring(x._1.lastIndexOf("/") + 1), x._2.replace("\n", "")))
+    val strsRdd: Array[(String, String)] = sc.wholeTextFiles(filePath)
+      .map { case (path, content) => new File(path).getName -> content.replace("\n", "") }
       .collect()
 
     for (file <- strsRdd)
@@ -41,43 +23,18 @@ object Utils {
     strs
   }
 
-  def writeLeafInfoToLocalFile(filePath: String, suffixes: Array[String]): Unit = {
-    val writer = new PrintWriter(new File(filePath))
-    suffixes.foreach(writer.println)
-    writer.close()
-  }
-
-  def writeLeafInfoToFile(filePath: String, suffixes: Array[String]): Unit = {
-    val hdfsUrl = URI.create(filePath)
-    val fs = FileSystem.get(URI.create("hdfs://" + hdfsUrl.getAuthority), new Configuration())
-
-    val writer = new PrintWriter(fs.create(new Path(filePath)))
-    suffixes.foreach(writer.println)
-    writer.close
-  }
-
-
-  def getDistinctStr(strs: Iterable[RangeSubString]): String = {
-    var res = ""
+  def getAlphabet(strs: Iterable[RangeSubString]): String = {
+    val chars = mutable.HashSet[Char]()
     for (str <- strs) {
-      res = (res + str.mkString).distinct
+      chars ++= str.toString
     }
-    res
+    chars.mkString
   }
 
-  def getUniqueTerminalSymbol(strs: String, terminalSymbol: Int): Char = {
-    var res = terminalSymbol
-    while (strs.contains(res.toChar)) {
-      res += 1
-    }
-    res.toChar
+  def genTerminal(alphabet: String): Char = {
+    (1 to 128).map(_.toChar).toSet.diff(alphabet.toSet).head
   }
 
-  /**
-    * Compute suffixes fo the given string sequence.
-    *
-    * @return
-    */
   def suffixes(strs: String*): Array[String] = {
     strs.zipWithIndex.flatMap { case (str: String, i: Int) =>
       suffixesWithLabel(i.toString, str)
@@ -91,5 +48,4 @@ object Utils {
   def suffixesWithLabelTerminal(label: String, str: String, terminal: String): Iterable[String] = {
     str.tails.filter(_.nonEmpty).map(label + ":" + _ + terminal).toArray.sorted
   }
-
 }

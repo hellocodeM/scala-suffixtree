@@ -213,7 +213,7 @@ class SparkMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
   test("trivial") {
     val str = "hello"
     val strs = Array(RangeSubString(str, "txt1"))
-    val alphabet = Utils.getDistinctStr(strs)
+    val alphabet = Utils.getAlphabet(strs)
     val terminal = "$"
     val prefixes = alphabet.map(_.toString)
 
