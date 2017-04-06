@@ -4,88 +4,41 @@ import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
-trait TreeNode {
+class TreeNode(var seq: RangeSubString) {
 
-  var seq: RangeSubString
+  lazy val children = new mutable.HashMap[Char, TreeNode]
+  lazy val terminals = new mutable.ArrayBuffer[RangeSubString]
 
-  def updateChild(ch: Char, edge: TreeNode): Unit
+  def hasChild(ch: Char) = children.contains(ch)
 
-  def children: scala.collection.Map[Char, TreeNode]
+  def childNode(ch: Char): TreeNode = children(ch)
 
-  def hasChild(ch: Char) = false
-
-  def childNode(ch: Char): TreeNode
-
-  def addChild(str: RangeSubString): Unit
-
-  def addChild(node: TreeNode): Unit
-}
-
-class LeafNode(override var seq: RangeSubString) extends TreeNode {
-
-  // additional terminal for same leaf node
-  // why not include seq into terminals: seq is variable, it could be changed when split edge, but terminal does not.
-  val terminals = new ArrayBuffer[RangeSubString]
-
-  override def childNode(ch: Char): TreeNode = {
-    throw new IllegalStateException("leaf node has no child node")
+  def addChild(str: RangeSubString): Unit = {
+    assert(!children.contains(str.head))
+    children += str.head -> new TreeNode(str)
   }
 
-  override def addChild(str: RangeSubString): Unit = {
-    throw new IllegalStateException()
-  }
-
-  override def children: Map[Char, TreeNode] = {
-    throw new IllegalStateException()
-  }
-
-  override def updateChild(ch: Char, edge: TreeNode): Unit = {
-    throw new IllegalStateException()
-  }
-
-  override def addChild(node: TreeNode): Unit = {
-    throw new IllegalStateException()
-  }
-
-  override def toString: String = {
-    s"LeafNode($seq, ${terminals.mkString(",")})"
-  }
-
-  def addTerminal(terminal: RangeSubString): Unit = {
-    terminals += terminal
-  }
-}
-
-class BranchNode(override var seq: RangeSubString) extends TreeNode {
-
-  override lazy val children = new mutable.HashMap[Char, TreeNode]
-
-  override def hasChild(ch: Char) = children.contains(ch)
-
-  override def childNode(ch: Char): TreeNode = children(ch)
-
-  override def addChild(str: RangeSubString): Unit = {
-    children += str.head -> new LeafNode(str)
-  }
-
-  override def addChild(node: TreeNode): Unit = {
+  def addChild(node: TreeNode): Unit = {
     children += node.seq.head -> node
   }
 
-  override def updateChild(ch: Char, node: TreeNode): Unit = {
+  def updateChild(ch: Char, node: TreeNode): Unit = {
     children.update(ch, node)
   }
 
+  def addTerminal(str: RangeSubString): Unit = {
+    terminals += str
+  }
+
   override def toString: String = {
-    s"BranchNode($seq)"
+    s"TreeNode($seq)"
   }
 }
 
 class McSuffixTree(terminalSymbol: String = "$") {
 
-  val root: TreeNode = new BranchNode(null)
+  val root = new TreeNode(null)
 
   def insert(str: String, label: String): Unit = {
     // insert all suffixes
@@ -115,8 +68,7 @@ class McSuffixTree(terminalSymbol: String = "$") {
           iter.updateChild(ch, splitEdgeAt(child, cp.length))
         } else if (cp.length == remain.length) {
           // remain is the leaf
-          val leaf = child.asInstanceOf[LeafNode]
-          leaf.addTerminal(remain)
+          child.addTerminal(remain)
         }
         remain = remain.drop(cp.length)
       }
@@ -127,81 +79,64 @@ class McSuffixTree(terminalSymbol: String = "$") {
   /**
     * r =seq=> origin
     *
-    * r =front=> middle =end=> origin
+    * r =front=> newNode =back=> origin
     */
   private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
     val front = origin.seq.take(length)
     val back = origin.seq.drop(length)
-    val middle = new BranchNode(front)
+    val newNode = new TreeNode(front)
     origin.seq = back
-    middle.addChild(origin)
-    middle
+    newNode.addChild(origin)
+    newNode
   }
 
-  def suffixes: Array[String] = {
+  def suffixes: Iterable[String] = {
     val leaves = new mutable.ArrayBuffer[String]()
-    val buff = new ArrayBuffer[String]()
 
     def dfs(r: TreeNode, height: Int): Unit = {
-      r match {
-        case x: LeafNode =>
-          // one leaf node contains multi string
-          val prefix = buff.init.mkString
-          x.terminals.foreach(terminal =>
-            //res += terminal.label + ":" + prefix + terminal.mkString
-            leaves += LeafInfo(height - 1, terminal.label, terminal.index).toString
-          )
-          leaves += LeafInfo(height - 1, x.seq.label, x.seq.index).toString
-        case _: BranchNode =>
-          for ((ch, child) <- r.children) {
-            buff += child.seq.mkString
-            dfs(child, height + 1)
-            buff.reduceToSize(buff.length - 1)
-          }
+      r.terminals.foreach(terminal =>
+        leaves += Utils.formatNode(terminal.label, height, terminal.index)
+      )
+      if (r.children.isEmpty) {
+        leaves += Utils.formatNode(r.seq.label, height, r.seq.index)
+      } else {
+        for ((ch, child) <- r.children) {
+          dfs(child, height + 1)
+        }
       }
     }
 
-    dfs(root, 1)
-    leaves.toArray
+    dfs(root, 0)
+    leaves
   }
 
-  /**
-    * 为了方便测试的输出模式
-    *
-    * @return
-    */
+  /** * 为了方便测试的输出模式 * * @return */
   def suffixesTest: Array[String] = {
     val res = new mutable.ArrayBuffer[String]()
-    val buff = new ArrayBuffer[String]()
+    val buff = new mutable.ArrayBuffer[String]()
 
     def dfs(r: TreeNode, height: Int): Unit = {
-      r match {
-        case x: LeafNode =>
-          // one leaf node contains multi string
-          val prefix = buff.init.mkString
-          x.terminals.foreach { terminal =>
-            res += terminal.label + ":" + prefix + terminal.mkString
-          }
-          res += x.seq.label + ":" + prefix + x.seq
-        // todo: normalize leaf representation
-        case _: BranchNode =>
-          for ((ch, child) <- r.children) {
-            buff += child.seq.mkString
-            dfs(child, height + 1)
-            buff.reduceToSize(buff.length - 1)
-          }
+      if (r.children.isEmpty) {
+        val str = buff.init.mkString + r.seq
+        res += s"${r.seq.label}:$str"
+        r.terminals.foreach { terminal =>
+          res += s"${terminal.label}:$str"
+        }
+      } else {
+        for ((ch, child) <- r.children) {
+          buff += child.seq.mkString
+          dfs(child, height + 1)
+          buff.reduceToSize(buff.length - 1)
+        }
+        for (terminal <- r.terminals) {
+          res += s"${terminal.label}:${buff.mkString}"
+        }
       }
     }
 
     dfs(root, 0)
     res.toArray.sorted
   }
-
-}
-
-case class LeafInfo(height: Int, source: String, suffixIdx: Int) {
-
-  override def toString: String = s"$height $source:$suffixIdx"
 }
 
 object McSuffixTree {
@@ -219,6 +154,14 @@ object McSuffixTree {
       }
       tree
     }.toArray
+  }
+
+  def buildOnSpark(sc: SparkContext, strs: Iterable[RangeSubString]): RDD[McSuffixTree] = {
+    val alphabet = Utils.getAlphabet(strs)
+    val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x)).map(x => x._1.toString + x._2)
+    val terminal = Utils.genTerminal(alphabet).toString
+
+    buildOnSpark(sc, strs, terminal, alphabet, prefixes)
   }
 
   def buildOnSpark(sc: SparkContext,
@@ -241,13 +184,5 @@ object McSuffixTree {
       }
       tree
     }
-  }
-
-  def buildOnSpark(sc: SparkContext, strs: Iterable[RangeSubString]): RDD[McSuffixTree] = {
-    val alphabet = Utils.getAlphabet(strs)
-    val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x)).map(x => x._1.toString + x._2)
-    val terminal = Utils.genTerminal(alphabet).toString
-
-    buildOnSpark(sc, strs, terminal, alphabet, prefixes)
   }
 }

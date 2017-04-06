@@ -43,9 +43,7 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
 
   def drop(n: Int) = substring(n, length)
 
-  override def toString = mkString //测试用
-
-  //  override def toString = s"$source $start $end $label $index"
+  override def toString = mkString
 
   def mkString = source.substring(start, end)
 }

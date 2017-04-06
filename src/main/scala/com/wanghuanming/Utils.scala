@@ -48,4 +48,8 @@ object Utils {
   def suffixesWithLabelTerminal(label: String, str: String, terminal: String): Iterable[String] = {
     str.tails.filter(_.nonEmpty).map(label + ":" + _ + terminal).toArray.sorted
   }
+
+  def formatNode(source: String, height: Int, index: Int): String = {
+    s"$height $source:$index"
+  }
 }
