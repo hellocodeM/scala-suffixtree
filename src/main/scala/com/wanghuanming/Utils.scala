@@ -8,7 +8,6 @@ import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.SparkContext
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 import scala.io.{BufferedSource, Source}
 
 /**
@@ -58,7 +57,7 @@ object Utils {
   }
 
 
-  def getDistinctStr(strs: ArrayBuffer[RangeSubString]): String = {
+  def getDistinctStr(strs: Iterable[RangeSubString]): String = {
     var res = ""
     for (str <- strs) {
       res = (res + str.mkString).distinct
@@ -85,7 +84,12 @@ object Utils {
     }.toArray.sorted
   }
 
-  def suffixesWithLabel(label: String, str: String): Array[String] = {
-    str.tails.filter(_.nonEmpty).map(label + ":" + _ + "$").toArray.sorted
+  def suffixesWithLabel(label: String, str: String): Iterable[String] = {
+    suffixesWithLabelTerminal(label, str, "$")
   }
+
+  def suffixesWithLabelTerminal(label: String, str: String, terminal: String): Iterable[String] = {
+    str.tails.filter(_.nonEmpty).map(label + ":" + _ + terminal).toArray.sorted
+  }
+
 }

@@ -1,8 +1,6 @@
 package com.wanghuanming
 
 
-import java.io.File
-
 import org.apache.spark.{SparkConf, SparkContext}
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
@@ -206,42 +204,14 @@ class SparkMcSuffixTreeTest extends FunSuite {
 
   test("trivial") {
     val str = "hello"
-    val strs = new mutable.ArrayBuffer[RangeSubString]
-    strs += RangeSubString(str, "txt1")
-    McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/")
+    val strs = Array(RangeSubString(str, "txt1"))
+    val alphabet = Utils.getDistinctStr(strs)
+    val terminal = "$"
+    val prefixes = alphabet.map(_.toString)
+
+    val trees = McSuffixTree.buildOnSpark(sc, strs, terminal, alphabet, prefixes)
+    val suffixes = trees.flatMap(_.suffixesTest).collect().sorted
+    assert(suffixes === Utils.suffixesWithLabel("txt1", str))
   }
 }
-
-class ExsetSparkMcSuffixTreeTest extends FunSuite {
-  val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")
-  val sc = new SparkContext(conf)
-  val strs = new mutable.ArrayBuffer[RangeSubString]
-  val resourceDir = "src/test/resources/exset/"
-
-  def normalize(input: BufferedSource): String = {
-    input.getLines().mkString
-  }
-
-  def expectedResult(name: String): Iterator[String] = {
-    Source.fromFile(filePath(name)).getLines
-  }
-
-  def filePath(name: String): String = {
-    resourceDir + name
-  }
-
-  test("ex0") {
-    val dir = new File(resourceDir + "ex3")
-
-    for (file <- dir.listFiles) {
-      val str: String = normalize(Source.fromFile(file))
-      strs += RangeSubString(str + "$", file.getName)
-    }
-
-    McSuffixTree.buildOnSpark(sc, strs, "src/test/resources/result/")
-
-    expectedResult("res0").foreach(println)
-  }
-}
-
 

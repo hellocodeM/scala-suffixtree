@@ -1,6 +1,7 @@
 package com.wanghuanming
 
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -223,30 +224,34 @@ object McSuffixTree {
     }.toArray
   }
 
-
-  def buildOnSpark(sc: SparkContext, strs: ArrayBuffer[RangeSubString], resFile: String): Unit = {
-    val alphabet = Utils.getDistinctStr(strs)
-    val terminalSymbol = Utils.getUniqueTerminalSymbol(alphabet, 500).toString
+  def buildOnSpark(sc: SparkContext,
+                   strs: Iterable[RangeSubString],
+                   terminal: String,
+                   alphabet: String,
+                   prefixes: Iterable[String]): RDD[McSuffixTree] = {
     val strsBV = sc.broadcast(strs)
-    val resFileBV = sc.broadcast(resFile)
-    val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x))
 
-    sc.parallelize(prefixes, 1024).foreach { head =>
-      val tree = new McSuffixTree(terminalSymbol)
-      val tempStr = strsBV.value
-      val prefix = head._1.toString + head._2
+    sc.parallelize(prefixes.toSeq).map { prefix =>
+      val tree = new McSuffixTree(terminal)
 
-      for (str <- tempStr) {
-        val S = str.mkString + terminalSymbol
+      for (str <- strsBV.value) {
+        val S = str + terminal
         for (i <- S.indices) {
           if (S.startsWith(prefix, i)) {
             tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))
           }
         }
       }
-      Utils.writeLeafInfoToFile(resFileBV.value + System.nanoTime(), tree.suffixes)
+      tree
     }
   }
 
 
+  def buildOnSpark(sc: SparkContext, strs: Iterable[RangeSubString]): RDD[McSuffixTree] = {
+    val alphabet = Utils.getDistinctStr(strs)
+    val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x)).map(x => x._1.toString + x._2)
+    val terminal = Utils.getUniqueTerminalSymbol(alphabet, 500).toString
+
+    buildOnSpark(sc, strs, terminal, alphabet, prefixes)
+  }
 }

@@ -13,7 +13,9 @@ object App {
     val sc = new SparkContext(conf)
 
     val strs = Utils.readAllStringFromFile(sc, args(0))
-    McSuffixTree.buildOnSpark(sc, strs, args(1)  + "/part-")
+    val trees = McSuffixTree.buildOnSpark(sc, strs)
+    val suffixes = trees.flatMap(_.suffixes)
+    suffixes.saveAsTextFile(args(1))
   }
 
 }
