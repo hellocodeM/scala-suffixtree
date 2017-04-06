@@ -1,6 +1,5 @@
 package com.wanghuanming
 
-import org.apache.spark.{SparkConf, SparkContext}
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
@@ -10,8 +9,6 @@ import org.scalatest.junit.JUnitRunner
   */
 @RunWith(classOf[JUnitRunner])
 class UtilsTest extends FunSuite {
-  val conf = new SparkConf().setMaster("local[4]").setAppName("UtilsTest")
-  val sc = new SparkContext(conf)
 
   test("testSuffixes") {
     val str = "test"

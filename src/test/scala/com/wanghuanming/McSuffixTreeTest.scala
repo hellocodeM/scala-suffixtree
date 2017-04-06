@@ -3,8 +3,8 @@ package com.wanghuanming
 
 import org.apache.spark.{SparkConf, SparkContext}
 import org.junit.runner.RunWith
-import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{BeforeAndAfter, FunSuite}
 
 import scala.collection.mutable
 import scala.io.{BufferedSource, Source}
@@ -197,10 +197,18 @@ class ExsetMcSuffixTreeTest extends FunSuite {
 }
 
 @RunWith(classOf[JUnitRunner])
-class SparkMcSuffixTreeTest extends FunSuite {
+class SparkMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
 
   val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")
-  val sc = new SparkContext(conf)
+  var sc: SparkContext = _
+
+  before {
+    sc = new SparkContext(conf)
+  }
+
+  after {
+    sc.stop()
+  }
 
   test("trivial") {
     val str = "hello"
