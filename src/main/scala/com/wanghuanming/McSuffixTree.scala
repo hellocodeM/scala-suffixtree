@@ -38,7 +38,7 @@ class TreeNode(var seq: RangeSubString) {
 
 class McSuffixTree(terminalSymbol: String = "$") {
 
-  val root = new TreeNode(null)
+  val root = new TreeNode(RangeSubString("", terminalSymbol))
 
   def insert(str: String, label: String): Unit = {
     // insert all suffixes
@@ -97,7 +97,7 @@ class McSuffixTree(terminalSymbol: String = "$") {
       r.terminals.foreach(terminal =>
         leaves += Utils.formatNode(terminal.label, height, terminal.index)
       )
-      if (r.children.isEmpty) {
+      if (r.children.isEmpty && r.seq != null && r.seq.nonEmpty) {
         leaves += Utils.formatNode(r.seq.label, height, r.seq.index)
       } else {
         for ((ch, child) <- r.children) {
