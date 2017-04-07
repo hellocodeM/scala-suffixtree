@@ -11,10 +11,10 @@ object App {
   def main(args : Array[String]) {
     val sc = new SparkContext()
 
-    val strs = Utils.readFromHDFS(sc, args(0))
-    val trees = McSuffixTree.buildOnSpark(sc, strs)
+    // TODO: find correct terminal
+    val trees = McSuffixTree.buildOnSpark(sc, args(0), 1.toChar.toString)
     val suffixes = trees.flatMap(_.suffixes)
     suffixes.saveAsTextFile(args(1))
+    sc.defaultParallelism
   }
-
 }

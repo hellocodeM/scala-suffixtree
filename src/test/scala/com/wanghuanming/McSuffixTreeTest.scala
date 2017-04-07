@@ -49,7 +49,7 @@ class McSuffixTreeTest extends FunSuite {
       Array("1024", "02"),
       Array("100", "10"),
       Array("10", "10"),
-      Array("abab"),
+      Array("abab", "ab"),
       Array("23", "23", "234", "123", "523", "235")
     )
     for (c <- cases) {
@@ -142,19 +142,13 @@ class McSuffixTreeTest extends FunSuite {
 }
 
 @RunWith(classOf[JUnitRunner])
-class ExsetMcSuffixTreeTest extends FunSuite {
+class ExsetMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
+
+  val conf = new SparkConf().setMaster("local[4]").setAppName("oh")
+  var sc: SparkContext = _
 
   def normalize(input: BufferedSource): String = {
     input.getLines().mkString
-  }
-
-  def expectedResult(name: String): Seq[String] = {
-    Source.fromFile(filePath(name)).getLines.toSeq
-  }
-
-  def filePath(name: String): String = {
-    val resourceDir = "src/test/resources/exset/"
-    resourceDir + name
   }
 
   test("exset") {
@@ -173,13 +167,15 @@ class ExsetMcSuffixTreeTest extends FunSuite {
       assert(expectedResult(res).sorted === suffixes)
     }
   }
-}
 
-@RunWith(classOf[JUnitRunner])
-class SparkMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
+  def expectedResult(name: String): Seq[String] = {
+    Source.fromFile(filePath(name)).getLines.toSeq
+  }
 
-  val conf = new SparkConf().setMaster("local[4]").setAppName("McSuffixTreeTest")
-  var sc: SparkContext = _
+  def filePath(name: String): String = {
+    val resourceDir = "src/test/resources/exset/"
+    resourceDir + name
+  }
 
   before {
     sc = new SparkContext(conf)
@@ -189,16 +185,54 @@ class SparkMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
     sc.stop()
   }
 
-  test("trivial") {
-    val str = "hello"
-    val strs = Array(RangeSubString(str, "txt1"))
-    val alphabet = Utils.getAlphabet(strs)
-    val terminal = "$"
-    val prefixes = alphabet.map(_.toString)
+  test("onSpark") {
+    for (i <- 0 to 3) {
+      val inputFile = "ex" + i
+      val res = "res" + i
+      val trees = McSuffixTree.buildOnSpark(sc, filePath(inputFile), 1.toChar.toString)
+      val suffixes = trees.flatMap(_.suffixes).collect.sorted
 
-    val trees = McSuffixTree.buildOnSpark(sc, strs, terminal, alphabet, prefixes)
-    val suffixes = trees.flatMap(_.suffixesTest).collect().sorted
-    assert(suffixes === Utils.suffixesWithLabel("txt1", str))
+      assert(suffixes === expectedResult(res).sorted)
+    }
   }
 }
 
+@RunWith(classOf[JUnitRunner])
+class SuffixPartitionTest extends FunSuite {
+
+  def rangeStrings(strs: String*): Iterable[RangeSubString] = {
+    strs.map(RangeSubString(_))
+  }
+
+  test("repartition") {
+    val p = SuffixPartition("", rangeStrings("abc", "bcd", "bde", "cab", "cbc", "cbd"), 0)
+    val res1 = p.repartition.toSet
+    val expected1 = Set(
+      SuffixPartition("a", rangeStrings("abc"), 0),
+      SuffixPartition("b", rangeStrings("bcd", "bde"), 1),
+      SuffixPartition("c", rangeStrings("cab", "cbc", "cbd"), 1)
+    )
+    assert(res1.canEqual(expected1))
+
+    val res2: Set[SuffixPartition] = res1.flatMap(_.repartition)
+    val expected2 = Set(
+      SuffixPartition("ab", rangeStrings("abc"), 0),
+      SuffixPartition("bc", rangeStrings("bcd"), 2),
+      SuffixPartition("bd", rangeStrings("bde"), 2),
+      SuffixPartition("ca", rangeStrings("cab"), 2),
+      SuffixPartition("cb", rangeStrings("cbc", "cbd"), 2)
+    )
+    assert(res2.canEqual(expected2))
+
+    val res3 = res2.flatMap(_.repartition)
+    val expected3 = Set(
+      SuffixPartition("ab", rangeStrings("abc"), 0),
+      SuffixPartition("bc", rangeStrings("bcd"), 2),
+      SuffixPartition("bd", rangeStrings("bde"), 2),
+      SuffixPartition("ca", rangeStrings("cab"), 2),
+      SuffixPartition("cbc", rangeStrings("cbc"), 3),
+      SuffixPartition("cbd", rangeStrings("cbd"), 3)
+    )
+    assert(res3.canEqual(expected3))
+  }
+}

@@ -39,9 +39,9 @@ class RangeSubString(source: String, start: Int, end: Int, val label: String, va
     RangeSubString(source, start + s, start + e, label, index)
   }
 
-  def take(n: Int) = substring(0, n)
+  def take(n: Int) = substring(0, Math.min(this.length, n))
 
-  def drop(n: Int) = substring(n, length)
+  def drop(n: Int) = substring(Math.min(this.length, n), length)
 
   override def toString = mkString
 
@@ -57,4 +57,9 @@ object RangeSubString {
   def apply(s: String, label: String = null): RangeSubString = {
     new RangeSubString(s, 0, s.length, label, 0)
   }
+
+  def apply(s: String, label: String, index: Int): RangeSubString = {
+    new RangeSubString(s, 0, s.length, label, index)
+  }
+
 }

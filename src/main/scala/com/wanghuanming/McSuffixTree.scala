@@ -1,6 +1,9 @@
 package com.wanghuanming
 
+import java.io.File
+
 import org.apache.spark.SparkContext
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -36,7 +39,7 @@ class TreeNode(var seq: RangeSubString) {
   }
 }
 
-class McSuffixTree(terminalSymbol: String = "$") {
+class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
 
   val root = new TreeNode(RangeSubString("", terminalSymbol))
 
@@ -106,7 +109,7 @@ class McSuffixTree(terminalSymbol: String = "$") {
       }
     }
 
-    dfs(root, 0)
+    dfs(root, baseHeight)
     leaves
   }
 
@@ -134,7 +137,7 @@ class McSuffixTree(terminalSymbol: String = "$") {
       }
     }
 
-    dfs(root, 0)
+    dfs(root, baseHeight)
     res.toArray.sorted
   }
 }
@@ -159,6 +162,8 @@ object McSuffixTree {
   def buildOnSpark(sc: SparkContext, strs: Iterable[RangeSubString]): RDD[McSuffixTree] = {
     val alphabet = Utils.getAlphabet(strs)
     val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x)).map(x => x._1.toString + x._2)
+    //    val prefixes1: Seq[String] = alphabet.map(_.toString)
+    //    val prefixes: Seq[String] = prefixes1 ++ prefixes2
     val terminal = Utils.genTerminal(alphabet).toString
 
     buildOnSpark(sc, strs, terminal, alphabet, prefixes)
@@ -183,6 +188,87 @@ object McSuffixTree {
         }
       }
       tree
+    }
+  }
+
+  private def preprocess(rdd: RDD[SuffixPartition], maxIteration: Int): RDD[SuffixPartition] = {
+    var prevCount = rdd.count()
+    println(s"Before preprocess, total $prevCount partitions")
+    var parted = rdd
+    for (i <- 1 to maxIteration) {
+      parted = parted.flatMap(_.repartition)
+      val count = parted.count
+      printf(s"After iteration $i, all suffixes are partitioned into $count parts\n")
+
+      if (count < prevCount * 2) {
+        return parted
+      }
+      prevCount = count
+    }
+    parted
+  }
+
+  def buildOnSpark(sc: SparkContext, hdfsPath: String, terminal: String): RDD[McSuffixTree] = {
+    val NumIteration = 5
+    val rdd = sc.wholeTextFiles(hdfsPath)
+      .repartition(sc.defaultParallelism)
+      .flatMap { case (file, content) =>
+        val stripped = content.replace("\n", "") + terminal
+        val label = new File(file).getName
+        stripped.indices.init
+          .map { index =>
+            // compress string
+            val sub = stripped.substring(index, Math.min(stripped.length, index + NumIteration))
+            RangeSubString(sub, label, index)
+          }
+          .map { s => s.take(1).toString -> s }
+      }.groupBy(_._1)
+
+    val origin = rdd.map { case (prefix, suffixes) =>
+      SuffixPartition(prefix, suffixes.map(_._2), 0)
+    }
+
+    val parted = preprocess(origin, NumIteration)
+
+
+    // restore string
+    val strings = sc.wholeTextFiles(hdfsPath).map { case (file, content) =>
+      new File(file).getName -> (content.replace("\n", "") + terminal)
+    }.collect().toMap
+    val stringsBV: Broadcast[Map[String, String]] = sc.broadcast(strings)
+
+    parted.map { part =>
+      val strings = stringsBV.value
+      val tree = new McSuffixTree(terminal, part.height)
+      part.strings.map { s =>
+        val origin = strings(s.label)
+        RangeSubString(origin, s.index, origin.length, s.label, s.index)
+      }.foreach(tree.insertSuffix)
+      tree
+    }
+  }
+}
+
+case class SuffixPartition(prefix: String,
+                           strings: Iterable[RangeSubString],
+                           height: Int
+                          ) {
+
+  def repartition: Iterable[SuffixPartition] = {
+    val m = prefix.length
+    val n = m + 1
+    val first = strings.head
+    val p = first.take(n).toString
+    val branching = strings.tail.exists(s => s.take(n).toString != p)
+    if (!branching) {
+      Iterable(SuffixPartition(p, strings, height))
+    } else {
+      // height++
+      strings.map { s => s.take(n).toString -> s }
+        .groupBy(_._1)
+        .map { case (gp: String, g: Iterable[(String, RangeSubString)]) =>
+          SuffixPartition(gp, g.map(_._2), height + 1)
+        }
     }
   }
 }

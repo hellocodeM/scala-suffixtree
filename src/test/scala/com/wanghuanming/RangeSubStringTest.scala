@@ -7,6 +7,12 @@ import org.scalatest.FunSuite
   */
 class RangeSubStringTest extends FunSuite {
 
+  test("take") {
+    val s = RangeSubString("hello", 1, 5, "label", 0)
+    assert("el" === s.take(2).toString)
+    assert("ello" === s.take(10).toString)
+  }
+
   test("commonPrefix") {
     val cases = Iterable(
       ("hello", "helle", "hell"),
