@@ -26,6 +26,7 @@ class UtilsTest extends FunSuite {
     val alphabet = Utils.getAlphabet(strs)
 
     assert("helo".sorted === alphabet.sorted)
+    println(Utils.getAlphabet(Iterable(RangeSubString(Random.alphanumeric.take(200).toString))))
   }
 
   def assertTerminal(str: String) = {
@@ -35,7 +36,7 @@ class UtilsTest extends FunSuite {
 
   test("genTerminal") {
     for (i <- 1 to 100) {
-      assertTerminal(Random.nextString(100))
+      assertTerminal(Random.nextString(200))
     }
   }
 }

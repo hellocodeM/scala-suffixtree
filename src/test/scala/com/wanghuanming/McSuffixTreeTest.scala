@@ -139,6 +139,7 @@ class McSuffixTreeTest extends FunSuite {
 
     assert(trees.flatMap(_.suffixesTest).sorted === Utils.suffixesWithLabel("1", str))
   }
+
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -189,50 +190,28 @@ class ExsetMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
     for (i <- 0 to 3) {
       val inputFile = "ex" + i
       val res = "res" + i
-      val trees = McSuffixTree.buildOnSpark(sc, filePath(inputFile), 1.toChar.toString)
-      val suffixes = trees.flatMap(_.suffixes).collect.sorted
-
-      assert(suffixes === expectedResult(res).sorted)
+      val rdd = Utils.readAsRDD(sc, filePath(inputFile))
+      val strs = rdd.collect()
+      val terminal = Utils.genTerminal(Utils.getAlphabet(strs)).toString
+      val trees = McSuffixTree.buildOnSpark(sc, rdd, strs, terminal)
+      val suffixes = trees.flatMap(_.suffixes).collect()
+      assert(suffixes.toSet === expectedResult(res).toSet)
     }
   }
-}
 
-@RunWith(classOf[JUnitRunner])
-class SuffixPartitionTest extends FunSuite {
-
-  def rangeStrings(strs: String*): Iterable[RangeSubString] = {
-    strs.map(RangeSubString(_))
-  }
-
-  test("repartition") {
-    val p = SuffixPartition("", rangeStrings("abc", "bcd", "bde", "cab", "cbc", "cbd"), 0)
-    val res1 = p.repartition.toSet
-    val expected1 = Set(
-      SuffixPartition("a", rangeStrings("abc"), 0),
-      SuffixPartition("b", rangeStrings("bcd", "bde"), 1),
-      SuffixPartition("c", rangeStrings("cab", "cbc", "cbd"), 1)
+  test("verticalPartition") {
+    val alphabet = "abcde$"
+    val strs = Iterable(
+      RangeSubString("abc$"),
+      RangeSubString("abc$"),
+      RangeSubString("ab$"),
+      RangeSubString("bcd$"),
+      RangeSubString("bde$"),
+      RangeSubString("b$")
     )
-    assert(res1.canEqual(expected1))
 
-    val res2: Set[SuffixPartition] = res1.flatMap(_.repartition)
-    val expected2 = Set(
-      SuffixPartition("ab", rangeStrings("abc"), 0),
-      SuffixPartition("bc", rangeStrings("bcd"), 2),
-      SuffixPartition("bd", rangeStrings("bde"), 2),
-      SuffixPartition("ca", rangeStrings("cab"), 2),
-      SuffixPartition("cb", rangeStrings("cbc", "cbd"), 2)
-    )
-    assert(res2.canEqual(expected2))
-
-    val res3 = res2.flatMap(_.repartition)
-    val expected3 = Set(
-      SuffixPartition("ab", rangeStrings("abc"), 0),
-      SuffixPartition("bc", rangeStrings("bcd"), 2),
-      SuffixPartition("bd", rangeStrings("bde"), 2),
-      SuffixPartition("ca", rangeStrings("cab"), 2),
-      SuffixPartition("cbc", rangeStrings("cbc"), 3),
-      SuffixPartition("cbd", rangeStrings("cbd"), 3)
-    )
-    assert(res3.canEqual(expected3))
+    val res = McSuffixTree.verticalPartition(sc, alphabet, sc.parallelize(strs.toSeq), 2)
+    val exp = Set("e", "abc", "cd", "c$", "ab$", "b$", "bd", "bcd", "bc$", "d")
+    assert(res.toSet === exp)
   }
 }

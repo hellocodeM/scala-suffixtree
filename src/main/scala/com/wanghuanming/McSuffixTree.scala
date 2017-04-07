@@ -1,13 +1,9 @@
 package com.wanghuanming
 
-import java.io.File
-
 import org.apache.spark.SparkContext
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
-
 
 
 class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
@@ -130,14 +126,48 @@ object McSuffixTree {
     }.toArray
   }
 
-  def buildOnSpark(sc: SparkContext, strs: Iterable[RangeSubString]): RDD[McSuffixTree] = {
+  def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
     val alphabet = Utils.getAlphabet(strs)
-    val prefixes = alphabet.flatMap(x => alphabet.map(_ -> x)).map(x => x._1.toString + x._2)
-    //    val prefixes1: Seq[String] = alphabet.map(_.toString)
-    //    val prefixes: Seq[String] = prefixes1 ++ prefixes2
-    val terminal = Utils.genTerminal(alphabet).toString
+    val prefixes = verticalPartition(sc, alphabet, rdd, 1000000)
 
     buildOnSpark(sc, strs, terminal, alphabet, prefixes)
+  }
+
+  def verticalPartition(sc: SparkContext, alphabet: String, rdd: RDD[RangeSubString], batchSize: Int): Iterable[String] = {
+    sc.setLogLevel("WARN")
+    println("=============VertialPartition===============")
+    val res = mutable.ArrayBuffer[String]()
+    // TODO: read from HDFS directly
+    val len2strs = mutable.Map[Int, Map[String, Int]]()
+
+    var pending = mutable.ArrayBuffer[String]() ++ alphabet.map(_.toString)
+    var cnt = 0
+    while (pending.nonEmpty) {
+      cnt += 1
+      println(s"Iteration $cnt, res=$res, pending=$pending")
+      val counts = pending.map { sprefix =>
+        val len = sprefix.length
+        val sprefixs = len2strs.getOrElseUpdate(len, {
+          rdd.flatMap(_.source.sliding(len).map(_ -> 1))
+            .reduceByKey(_ + _)
+            .collect()
+            .toMap
+        }).withDefaultValue(0)
+        sprefix -> sprefixs(sprefix)
+      }
+      val (first, last) = counts.partition { case (x, cnt) => 0 < cnt && cnt <= batchSize }
+
+      res ++= first.map(_._1)
+      pending.clear()
+      pending ++= last
+        .filter(_._2 > 0)
+        .map(_._1)
+        .flatMap { sprefix => alphabet.map(x => sprefix + x) }
+    }
+    sc.setLogLevel("INFO")
+
+    println(s"============After Vertical Paritition, ${res.length} parts")
+    res
   }
 
   def buildOnSpark(sc: SparkContext,
@@ -162,62 +192,6 @@ object McSuffixTree {
     }
   }
 
-  private def preprocess(rdd: RDD[SuffixPartition], maxIteration: Int): RDD[SuffixPartition] = {
-    var prevCount = rdd.count()
-    println(s"Before preprocess, total $prevCount partitions")
-    var parted = rdd
-    for (i <- 1 to maxIteration) {
-      parted = parted.flatMap(_.repartition)
-      val count = parted.count
-      printf(s"After iteration $i, all suffixes are partitioned into $count parts\n")
-
-      if (count < prevCount * 2) {
-        return parted
-      }
-      prevCount = count
-    }
-    parted
-  }
-
-  def buildOnSpark(sc: SparkContext, hdfsPath: String, terminal: String): RDD[McSuffixTree] = {
-    val NumIteration = 5
-    val rdd = sc.wholeTextFiles(hdfsPath)
-      .repartition(sc.defaultParallelism)
-      .flatMap { case (file, content) =>
-        val stripped = content.replace("\n", "") + terminal
-        val label = new File(file).getName
-        stripped.indices.init
-          .map { index =>
-            // compress string
-            val sub = stripped.substring(index, Math.min(stripped.length, index + NumIteration))
-            RangeSubString(sub, label, index)
-          }
-          .map { s => s.take(1).toString -> s }
-      }.groupBy(_._1)
-
-    val origin = rdd.map { case (prefix, suffixes) =>
-      SuffixPartition(prefix, suffixes.map(_._2), 0)
-    }
-
-    val parted = preprocess(origin, NumIteration)
-
-
-    // restore string
-    val strings = sc.wholeTextFiles(hdfsPath).map { case (file, content) =>
-      new File(file).getName -> (content.replace("\n", "") + terminal)
-    }.collect().toMap
-    val stringsBV: Broadcast[Map[String, String]] = sc.broadcast(strings)
-
-    parted.map { part =>
-      val strings = stringsBV.value
-      val tree = new McSuffixTree(terminal, part.height)
-      part.strings.map { s =>
-        val origin = strings(s.label)
-        RangeSubString(origin, s.index, origin.length, s.label, s.index)
-      }.foreach(tree.insertSuffix)
-      tree
-    }
-  }
 }
 
 

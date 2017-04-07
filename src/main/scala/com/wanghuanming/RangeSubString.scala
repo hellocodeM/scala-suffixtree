@@ -5,7 +5,7 @@ package com.wanghuanming
   * SubString of a long string could be represented as [start, end).
   * Label is used to identify same substring of two different string.
   */
-class RangeSubString(source: String, start: Int, end: Int, val label: String, val index: Int) extends Serializable {
+class RangeSubString(val source: String, val start: Int, val end: Int, val label: String, val index: Int) extends Serializable {
 
   def apply(idx: Int) = source(start + idx)
 

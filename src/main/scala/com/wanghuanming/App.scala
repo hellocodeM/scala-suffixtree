@@ -11,10 +11,15 @@ object App {
   def main(args : Array[String]) {
     val sc = new SparkContext()
 
-    // TODO: find correct terminal
-    val trees = McSuffixTree.buildOnSpark(sc, args(0), 1.toChar.toString)
+    val input = args(0)
+    val output = args(1)
+    val rdd = Utils.readAsRDD(sc, input)
+    val strs = rdd.collect()
+    val alphabet = Utils.getAlphabet(strs)
+    val terminal = Utils.genTerminal(alphabet).toString
+
+    val trees = McSuffixTree.buildOnSpark(sc, rdd, strs, terminal)
     val suffixes = trees.flatMap(_.suffixes)
-    suffixes.saveAsTextFile(args(1))
-    sc.defaultParallelism
+    suffixes.saveAsTextFile(output)
   }
 }

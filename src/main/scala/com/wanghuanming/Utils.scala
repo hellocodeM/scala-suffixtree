@@ -3,6 +3,7 @@ package com.wanghuanming
 import java.io.File
 
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 
@@ -11,16 +12,16 @@ import scala.collection.mutable
   */
 object Utils {
 
-  def readFromHDFS(sc: SparkContext, filePath: String): mutable.ArrayBuffer[RangeSubString] = {
-    val strs = new mutable.ArrayBuffer[RangeSubString]
-    val strsRdd: Array[(String, String)] = sc.wholeTextFiles(filePath)
-      .map { case (path, content) => new File(path).getName -> content.replace("\n", "") }
-      .collect()
+  def readAsIterable(sc: SparkContext, filePath: String): Iterable[RangeSubString] = {
+    readAsRDD(sc, filePath).collect
+  }
 
-    for (file <- strsRdd)
-      strs += RangeSubString(file._2, file._1)
-
-    strs
+  def readAsRDD(sc: SparkContext, filePath: String): RDD[RangeSubString] = {
+    sc.wholeTextFiles(filePath)
+      .map { case (path, content) =>
+        val name = new File(path).getName
+        RangeSubString(content.replace("\n", ""), name)
+      }
   }
 
   def getAlphabet(strs: Iterable[RangeSubString]): String = {
@@ -32,7 +33,8 @@ object Utils {
   }
 
   def genTerminal(alphabet: String): Char = {
-    (1 to 128).map(_.toChar).toSet.diff(alphabet.toSet).head
+    //TODO
+    (1 to 10000).map(_.toChar).toSet.diff(alphabet.toSet).head
   }
 
   def suffixes(strs: String*): Array[String] = {
