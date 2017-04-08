@@ -1,4 +1,4 @@
-package com.wanghuanming
+package com.wanghuanming.suffixtree
 
 import org.scalatest.FunSuite
 

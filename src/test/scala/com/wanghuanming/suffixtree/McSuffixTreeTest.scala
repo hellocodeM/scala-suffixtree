@@ -1,5 +1,4 @@
-package com.wanghuanming
-
+package com.wanghuanming.suffixtree
 
 import java.io.File
 
@@ -100,9 +99,9 @@ class McSuffixTreeTest extends FunSuite {
   }
 
   def debugDiff(res: Seq[String], expected: Seq[String], diff: Seq[String], source: Seq[String]): Unit = {
-    printf(s"result -- expected = ${res diff expected}\n")
-    printf(s"expected -- result = ${expected diff res}\n")
-    printf(s"sources = ${source.mkString(",")}\n")
+    println(s"result -- expected = ${res diff expected}")
+    println(s"expected -- result = ${expected diff res}")
+    println(s"sources = ${source.mkString(",")}")
     println("targets: ")
     diff.map(_.split(":")(0).toInt).distinct.foreach { index =>
       println(source(index))

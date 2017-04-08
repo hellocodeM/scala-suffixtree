@@ -1,4 +1,4 @@
-package com.wanghuanming
+package com.wanghuanming.suffixtree
 
 /**
   * Created by ming on 16-11-12.
@@ -32,16 +32,16 @@ class RangeSubString(val source: String, val start: Int, val end: Int, val label
     this.substring(0, len)
   }
 
+  def take(n: Int) = substring(0, Math.min(this.length, n))
+
+  def drop(n: Int) = substring(Math.min(this.length, n), length)
+
   def length = end - start
 
   def substring(s: Int, e: Int) = {
     assert(s <= e)
     RangeSubString(source, start + s, start + e, label, index)
   }
-
-  def take(n: Int) = substring(0, Math.min(this.length, n))
-
-  def drop(n: Int) = substring(Math.min(this.length, n), length)
 
   override def toString = mkString
 
