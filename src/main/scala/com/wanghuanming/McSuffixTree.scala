@@ -112,32 +112,50 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
 object McSuffixTree {
 
   def buildByPrefix(str: String, label: String): Array[McSuffixTree] = {
-    val alphabet = str.distinct
+    val alphabet = str.distinct.map(_.toString)
     val terminal = "$"
-    val S = str + terminal
     alphabet.par.map { prefix =>
-      val tree = new McSuffixTree(terminal)
-      for (i <- S.indices) {
-        if (S(i) == prefix) {
-          tree.insertSuffix(RangeSubString(S, i, S.length, label, i))
-        }
-      }
-      tree
+      buildTree(Iterable(RangeSubString(str, label)), prefix, terminal)
     }.toArray
   }
 
   def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
     val alphabet = Utils.getAlphabet(strs)
-    val prefixes = verticalPartition(sc, alphabet, rdd, 1000000)
+    val terminaled = rdd.map(s => RangeSubString(s.source + terminal))
+    val prefixes = verticalPartition(sc, alphabet, terminaled, 1000000)
+    val strsBV = sc.broadcast(strs)
 
-    buildOnSpark(sc, strs, terminal, alphabet, prefixes)
+    sc.parallelize(prefixes.toSeq).map { sprefix =>
+      buildTree(strsBV.value, sprefix, terminal)
+    }
+  }
+
+  /**
+    * Build general suffix-tree by s-prefix
+    *
+    * @param strs     all strings, not contains terminal
+    * @param sprefix  s-prefix
+    * @param terminal terminal symbol
+    * @return
+    */
+  def buildTree(strs: Iterable[RangeSubString], sprefix: String, terminal: String): McSuffixTree = {
+    val tree = new McSuffixTree(terminal)
+
+    for (s <- strs) {
+      val str = s + terminal
+      for (i <- str.indices.init) {
+        if (str.startsWith(sprefix, i)) {
+          tree.insertSuffix(RangeSubString(str, i, str.length, s.label, i))
+        }
+      }
+    }
+    tree
   }
 
   def verticalPartition(sc: SparkContext, alphabet: String, rdd: RDD[RangeSubString], batchSize: Int): Iterable[String] = {
     sc.setLogLevel("WARN")
     println("=============VertialPartition===============")
     val res = mutable.ArrayBuffer[String]()
-    // TODO: read from HDFS directly
     val len2strs = mutable.Map[Int, Map[String, Int]]()
 
     var pending = mutable.ArrayBuffer[String]() ++ alphabet.map(_.toString)
@@ -170,28 +188,5 @@ object McSuffixTree {
     res
   }
 
-  def buildOnSpark(sc: SparkContext,
-                   strs: Iterable[RangeSubString],
-                   terminal: String,
-                   alphabet: String,
-                   prefixes: Iterable[String]): RDD[McSuffixTree] = {
-    val strsBV = sc.broadcast(strs)
-
-    sc.parallelize(prefixes.toSeq).map { prefix =>
-      val tree = new McSuffixTree(terminal)
-
-      for (str <- strsBV.value) {
-        val S = str + terminal
-        for (i <- S.indices) {
-          if (S.startsWith(prefix, i)) {
-            tree.insertSuffix(RangeSubString(S, i, S.length, str.label, i))
-          }
-        }
-      }
-      tree
-    }
-  }
-
 }
-
 

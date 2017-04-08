@@ -12,16 +12,16 @@ import scala.collection.mutable
   */
 object Utils {
 
-  def readAsIterable(sc: SparkContext, filePath: String): Iterable[RangeSubString] = {
-    readAsRDD(sc, filePath).collect
-  }
-
   def readAsRDD(sc: SparkContext, filePath: String): RDD[RangeSubString] = {
     sc.wholeTextFiles(filePath)
       .map { case (path, content) =>
         val name = new File(path).getName
         RangeSubString(content.replace("\n", ""), name)
       }
+  }
+
+  def getAlphabet(str: String): String = {
+    str.distinct
   }
 
   def getAlphabet(strs: Iterable[RangeSubString]): String = {

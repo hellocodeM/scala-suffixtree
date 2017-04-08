@@ -78,10 +78,6 @@ class McSuffixTreeTest extends FunSuite {
     assert(diff.isEmpty, debugDiff(res, expected, diff, sources))
   }
 
-  test("specific case") {
-    testInsertForStrings(Array("rM6pXM9Osb", "QZW8xI04sU", "rM6pXM9Osb", "QZW8xI04sU"))
-  }
-
   test("insert many randomly short string") {
     val n = 100
     val size = 10
