@@ -33,8 +33,7 @@ object Utils {
   }
 
   def genTerminal(alphabet: String): Char = {
-    //TODO
-    (1 to 10000).map(_.toChar).toSet.diff(alphabet.toSet).head
+    (1 to 1000).map(_.toChar).toSet.diff(alphabet.toSet).head
   }
 
   def suffixes(strs: String*): Array[String] = {

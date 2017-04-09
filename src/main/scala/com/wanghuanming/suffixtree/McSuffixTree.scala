@@ -8,7 +8,7 @@ import scala.collection.mutable
 
 class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
 
-  val root = new TreeNode(RangeSubString("", terminalSymbol))
+  val root = new TreeNode(null)
 
   def insert(str: String, label: String): Unit = {
     // insert all suffixes
@@ -46,20 +46,6 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
     }
   }
 
-  /**
-    * r =seq=> origin
-    *
-    * r =front=> newNode =back=> origin
-    */
-  private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
-    val front = origin.seq.take(length)
-    val back = origin.seq.drop(length)
-    val newNode = new TreeNode(front)
-    origin.seq = back
-    newNode.addChild(origin)
-    newNode
-  }
-
   def suffixes: Iterable[String] = {
     val leaves = new mutable.ArrayBuffer[String]()
 
@@ -67,9 +53,11 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
       r.terminals.foreach(terminal =>
         leaves += Utils.formatNode(terminal.label, height, terminal.index)
       )
-      if (r.children.isEmpty && r.seq != null && r.seq.nonEmpty) {
+      assert(r == root || r.seq.nonEmpty)
+      if (r.children.isEmpty) {
         leaves += Utils.formatNode(r.seq.label, height, r.seq.index)
       } else {
+        assert(r == root || r.children.size != 1)
         for ((ch, child) <- r.children) {
           dfs(child, height + 1)
         }
@@ -107,6 +95,43 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
     dfs(root, baseHeight)
     res.toArray.sorted
   }
+
+  def splitSprefix(sprefixes: Iterable[String]) = {
+    val head = root.children.head._1
+    var level1 = mutable.ArrayBuffer[TreeNode]() ++ root.children.values
+    val sortedSprefixes = sprefixes.filter(_.head == head).toSeq.sortBy(_.length).reverse
+
+    while (level1.nonEmpty) {
+      val tmp = mutable.ArrayBuffer[TreeNode]()
+      level1.foreach { node =>
+        sortedSprefixes.foreach { sprefix =>
+          val common = node.seq.commonPrefix(RangeSubString(sprefix))
+          if (0 < common.length && common.length < node.seq.length) {
+            val newLevel1Node = splitEdgeAt(node, common.length)
+            root.updateChild(common.head, newLevel1Node)
+            tmp += newLevel1Node
+          }
+        }
+      }
+      level1 = tmp
+    }
+  }
+
+  /**
+    * r =seq=> origin
+    *
+    * r =front=> newNode =back=> origin
+    */
+  private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
+    assert(0 < length && length <= origin.seq.length)
+    val front = origin.seq.take(length)
+    val back = origin.seq.drop(length)
+    val newNode = new TreeNode(front)
+    origin.seq = back
+    newNode.addChild(origin)
+    newNode
+  }
+
 }
 
 object McSuffixTree {
@@ -115,19 +140,8 @@ object McSuffixTree {
     val alphabet = str.distinct.map(_.toString)
     val terminal = "$"
     alphabet.par.map { prefix =>
-      buildTree(Iterable(RangeSubString(str, label)), prefix, terminal)
+      buildTree(Iterable(RangeSubString(str, label)), prefix, terminal, alphabet)
     }.toArray
-  }
-
-  def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
-    val alphabet = Utils.getAlphabet(strs)
-    val terminaled = rdd.map(s => RangeSubString(s.source + terminal))
-    val prefixes = verticalPartition(sc, alphabet, terminaled, 1000000)
-    val strsBV = sc.broadcast(strs)
-
-    sc.parallelize(prefixes.toSeq).map { sprefix =>
-      buildTree(strsBV.value, sprefix, terminal)
-    }
   }
 
   /**
@@ -138,7 +152,7 @@ object McSuffixTree {
     * @param terminal terminal symbol
     * @return
     */
-  def buildTree(strs: Iterable[RangeSubString], sprefix: String, terminal: String): McSuffixTree = {
+  def buildTree(strs: Iterable[RangeSubString], sprefix: String, terminal: String, sprefixes: Iterable[String]): McSuffixTree = {
     val tree = new McSuffixTree(terminal)
 
     for (s <- strs) {
@@ -149,7 +163,20 @@ object McSuffixTree {
         }
       }
     }
+    tree.splitSprefix(sprefixes.filter(_ != sprefix))
     tree
+  }
+
+  def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
+    val alphabet = Utils.getAlphabet(strs)
+    val terminaled = rdd.map(s => RangeSubString(s.source + terminal))
+    val prefixes = verticalPartition(sc, alphabet, terminaled, 1000000)
+    val strsBV = sc.broadcast(strs)
+    val sprefixesBV = sc.broadcast(prefixes)
+
+    sc.parallelize(prefixes.toSeq).map { sprefix =>
+      buildTree(strsBV.value, sprefix, terminal, sprefixesBV.value)
+    }
   }
 
   def verticalPartition(sc: SparkContext, alphabet: String, rdd: RDD[RangeSubString], batchSize: Int): Iterable[String] = {

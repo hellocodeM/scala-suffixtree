@@ -41,12 +41,6 @@
             <version>3.0.0</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.abahgat</groupId>
-            <artifactId>suffixtree</artifactId>
-            <version>1.0.1-SNAPSHOT</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>

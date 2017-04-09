@@ -20,10 +20,12 @@ class TreeNode(var seq: RangeSubString) {
   }
 
   def addChild(node: TreeNode): Unit = {
+    assert(!children.contains(node.seq.head))
     children += node.seq.head -> node
   }
 
   def updateChild(ch: Char, node: TreeNode): Unit = {
+    assert(ch == node.seq.head && children.contains(ch))
     children.update(ch, node)
   }
 

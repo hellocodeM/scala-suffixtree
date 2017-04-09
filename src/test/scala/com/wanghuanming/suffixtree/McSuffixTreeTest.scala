@@ -140,7 +140,7 @@ class McSuffixTreeTest extends FunSuite {
 @RunWith(classOf[JUnitRunner])
 class ExsetMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
 
-  val conf = new SparkConf().setMaster("local[4]").setAppName("oh")
+  val conf = new SparkConf().setMaster("local[8]").setAppName("oh")
   var sc: SparkContext = _
 
   def normalize(input: BufferedSource): String = {
