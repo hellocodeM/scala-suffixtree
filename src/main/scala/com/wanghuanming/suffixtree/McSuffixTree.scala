@@ -54,10 +54,9 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
         leaves += Utils.formatNode(terminal.label, height, terminal.index)
       )
       assert(r == root || r.seq.nonEmpty)
-      if (r.children.isEmpty) {
+      if (r.children.isEmpty && r.seq != null) {
         leaves += Utils.formatNode(r.seq.label, height, r.seq.index)
       } else {
-        assert(r == root || r.children.size != 1)
         for ((ch, child) <- r.children) {
           dfs(child, height + 1)
         }
@@ -96,24 +95,28 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
     res.toArray.sorted
   }
 
-  def splitSprefix(sprefixes: Iterable[String]) = {
+  def splitSprefix(sprefixes: Iterable[String]): Unit = {
+    if (root.children.isEmpty) {
+      return
+    }
+    assert(root.children.size == 1)
     val head = root.children.head._1
-    var level1 = mutable.ArrayBuffer[TreeNode]() ++ root.children.values
-    val sortedSprefixes = sprefixes.filter(_.head == head).toSeq.sortBy(_.length).reverse
+    var level1 = root.children.head._2
+    val sprefix = level1.seq
+    println(s"Spliting prefix,sprefix=$sprefix,level1=${level1.seq}")
 
-    while (level1.nonEmpty) {
-      val tmp = mutable.ArrayBuffer[TreeNode]()
-      level1.foreach { node =>
-        sortedSprefixes.foreach { sprefix =>
-          val common = node.seq.commonPrefix(RangeSubString(sprefix))
-          if (0 < common.length && common.length < node.seq.length) {
-            val newLevel1Node = splitEdgeAt(node, common.length)
-            root.updateChild(common.head, newLevel1Node)
-            tmp += newLevel1Node
-          }
-        }
+    var end = level1.seq.length - 1
+
+    while (end >= 1) {
+      val common = level1.seq.substring(0, end)
+      if (sprefixes.exists(_.startsWith(common.toString))) {
+        level1 = splitEdgeAt(level1, common.length)
+        root.updateChild(head, level1)
+        end = level1.seq.length - 1
+        println(s"Spliting prefix,sprefix=$sprefix,level1=${level1.seq}")
+      } else {
+        end -= 1
       }
-      level1 = tmp
     }
   }
 
@@ -144,12 +147,15 @@ object McSuffixTree {
   }
 
   def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
-    val alphabet = Utils.getAlphabet(strs)
-    val prefixes = verticalPartition(sc, alphabet, rdd, 1000000)
-    val strsBV = sc.broadcast(strs.zipWithIndex.map { case (str, i) =>
+    val terminalRDD = rdd.zipWithIndex().map { case (s, i) =>
       val terminal = (i + 255).toChar
-      str.copy(source = str.source + terminal, end = str.end + 1)
-    })
+      s.copy(source = s.source + terminal, end = s.end + 1)
+    }
+    val terminalSymbols = (0 until strs.size).map(x => (x + 255).toChar)
+    val alphabet = Utils.getAlphabet(strs)
+    val prefixes = verticalPartition(alphabet, terminalSymbols, terminalRDD, 100000)
+
+    val strsBV = sc.broadcast(terminalRDD.collect)
     val sprefixesBV = sc.broadcast(prefixes)
 
     sc.parallelize(prefixes.toSeq).map { sprefix =>
@@ -160,8 +166,8 @@ object McSuffixTree {
   /**
     * Build general suffix-tree by s-prefix
     *
-    * @param strs     all strings, not contains terminal
-    * @param sprefix  s-prefix
+    * @param strs    all strings, not contains terminal
+    * @param sprefix s-prefix
     * @return
     */
   def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
@@ -179,15 +185,21 @@ object McSuffixTree {
     tree
   }
 
-  def verticalPartition(sc: SparkContext, alphabet: String, rdd: RDD[RangeSubString], batchSize: Int): Iterable[String] = {
+  def verticalPartition(alphabet: Iterable[Char],
+                        terminalSymbols: Iterable[Char],
+                        rdd: RDD[RangeSubString],
+                        batchSize: Int): Iterable[String] = {
+    val sc = rdd.context
     sc.setLogLevel("WARN")
     println("=============VertialPartition===============")
     val res = mutable.ArrayBuffer[String]()
     val len2strs = mutable.Map[Int, Map[String, Int]]()
+    val allSymbols = alphabet ++ terminalSymbols
 
     var pending = mutable.ArrayBuffer[String]() ++ alphabet.map(_.toString)
     var cnt = 0
-    while (pending.nonEmpty) {
+    val maxIteration = 10
+    while (pending.nonEmpty && cnt < maxIteration) {
       cnt += 1
       println(s"Iteration $cnt, res=$res, pending=$pending")
       val counts = pending.map { sprefix =>
@@ -200,20 +212,20 @@ object McSuffixTree {
         }).withDefaultValue(0)
         sprefix -> sprefixs(sprefix)
       }
-      val (first, last) = counts.partition { case (x, cnt) => 0 < cnt && cnt <= batchSize }
+      val (first, last) = counts.partition { case (x, c) => 0 < c && c <= batchSize }
 
       res ++= first.map(_._1)
       pending.clear()
       pending ++= last
         .filter(_._2 > 0)
         .map(_._1)
-        .flatMap { sprefix => alphabet.map(x => sprefix + x) }
+        .flatMap { sprefix => allSymbols.map(x => sprefix + x) }
     }
+    res ++= pending
     sc.setLogLevel("INFO")
 
-    println(s"============After Vertical Paritition, ${res.length} parts")
+    println(s"============After Vertical Paritition, ${res.length} parts,they are $res")
     res
   }
-
 }
 

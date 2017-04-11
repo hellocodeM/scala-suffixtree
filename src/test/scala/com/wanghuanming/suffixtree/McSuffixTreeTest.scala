@@ -135,6 +135,21 @@ class McSuffixTreeTest extends FunSuite {
     assert(trees.flatMap(_.suffixesTest).sorted === Utils.suffixesWithLabel("1", str))
   }
 
+  test("splitSprefix") {
+    val tree = new McSuffixTree
+    tree.insertSuffix(RangeSubString("abcde$"))
+    tree.insertSuffix(RangeSubString("abcef$"))
+    tree.splitSprefix(Array("abd", "af"))
+
+    val level1 = tree.root.children.head._2
+    assert(level1.seq.toString === "a")
+    val level2 = level1.children.values
+    assert(level2.map(_.seq.toString).toSeq.sorted === Array("b").sorted)
+    val level3 = level2.flatMap(_.children.values)
+    assert(level3.map(_.seq.toString).toSeq.sorted === Array("c").sorted)
+    val level4 = level3.flatMap(_.children.values)
+    assert(level4.map(_.seq.toString).toSeq.sorted === Array("de$", "ef$").sorted)
+  }
 }
 
 @RunWith(classOf[JUnitRunner])
