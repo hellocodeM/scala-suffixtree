@@ -130,7 +130,7 @@ class McSuffixTreeTest extends FunSuite {
 
   test("buildByPrefix") {
     val str = "hello"
-    val trees = McSuffixTree.buildByPrefix(str, "1")
+    val trees = McSuffixTree.buildByPrefix(str, "1", "$")
 
     assert(trees.flatMap(_.suffixesTest).sorted === Utils.suffixesWithLabel("1", str))
   }

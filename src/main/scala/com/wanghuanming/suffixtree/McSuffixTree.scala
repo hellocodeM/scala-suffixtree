@@ -136,12 +136,25 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
 
 object McSuffixTree {
 
-  def buildByPrefix(str: String, label: String): Array[McSuffixTree] = {
-    val alphabet = str.distinct.map(_.toString)
-    val terminal = "$"
+  def buildByPrefix(str: String, label: String, terminal: String): Array[McSuffixTree] = {
+    val alphabet = Utils.getAlphabet(str)
     alphabet.par.map { prefix =>
-      buildTree(Iterable(RangeSubString(str, label)), prefix, terminal, alphabet)
+      buildTree(Iterable(RangeSubString(str + terminal, label)), prefix.toString, alphabet.map(_.toString))
     }.toArray
+  }
+
+  def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
+    val alphabet = Utils.getAlphabet(strs)
+    val prefixes = verticalPartition(sc, alphabet, rdd, 1000000)
+    val strsBV = sc.broadcast(strs.zipWithIndex.map { case (str, i) =>
+      val terminal = (i + 255).toChar
+      str.copy(source = str.source + terminal, end = str.end + 1)
+    })
+    val sprefixesBV = sc.broadcast(prefixes)
+
+    sc.parallelize(prefixes.toSeq).map { sprefix =>
+      buildTree(strsBV.value, sprefix, sprefixesBV.value)
+    }
   }
 
   /**
@@ -149,14 +162,13 @@ object McSuffixTree {
     *
     * @param strs     all strings, not contains terminal
     * @param sprefix  s-prefix
-    * @param terminal terminal symbol
     * @return
     */
-  def buildTree(strs: Iterable[RangeSubString], sprefix: String, terminal: String, sprefixes: Iterable[String]): McSuffixTree = {
-    val tree = new McSuffixTree(terminal)
+  def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
+    val tree = new McSuffixTree
 
     for (s <- strs) {
-      val str = s + terminal
+      val str = s.toString
       for (i <- str.indices.init) {
         if (str.startsWith(sprefix, i)) {
           tree.insertSuffix(RangeSubString(str, i, str.length, s.label, i))
@@ -165,18 +177,6 @@ object McSuffixTree {
     }
     tree.splitSprefix(sprefixes.filter(_ != sprefix))
     tree
-  }
-
-  def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
-    val alphabet = Utils.getAlphabet(strs)
-    val terminaled = rdd.map(s => RangeSubString(s.source + terminal))
-    val prefixes = verticalPartition(sc, alphabet, terminaled, 1000000)
-    val strsBV = sc.broadcast(strs)
-    val sprefixesBV = sc.broadcast(prefixes)
-
-    sc.parallelize(prefixes.toSeq).map { sprefix =>
-      buildTree(strsBV.value, sprefix, terminal, sprefixesBV.value)
-    }
   }
 
   def verticalPartition(sc: SparkContext, alphabet: String, rdd: RDD[RangeSubString], batchSize: Int): Iterable[String] = {

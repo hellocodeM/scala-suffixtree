@@ -5,7 +5,7 @@ package com.wanghuanming.suffixtree
   * SubString of a long string could be represented as [start, end).
   * Label is used to identify same substring of two different string.
   */
-class RangeSubString(val source: String, val start: Int, val end: Int, val label: String, val index: Int) extends Serializable {
+case class RangeSubString(source: String, start: Int, end: Int, label: String, index: Int) extends Serializable {
 
   def apply(idx: Int) = source(start + idx)
 
@@ -32,10 +32,6 @@ class RangeSubString(val source: String, val start: Int, val end: Int, val label
     this.substring(0, len)
   }
 
-  def take(n: Int) = substring(0, Math.min(this.length, n))
-
-  def drop(n: Int) = substring(Math.min(this.length, n), length)
-
   def length = end - start
 
   def substring(s: Int, e: Int) = {
@@ -43,16 +39,16 @@ class RangeSubString(val source: String, val start: Int, val end: Int, val label
     RangeSubString(source, start + s, start + e, label, index)
   }
 
+  def take(n: Int) = substring(0, Math.min(this.length, n))
+
+  def drop(n: Int) = substring(Math.min(this.length, n), length)
+
   override def toString = mkString
 
   def mkString = source.substring(start, end)
 }
 
 object RangeSubString {
-
-  def apply(s: String, start: Int, end: Int, label: String, i: Int): RangeSubString = {
-    new RangeSubString(s, start, end, label, i)
-  }
 
   def apply(s: String, label: String = null): RangeSubString = {
     new RangeSubString(s, 0, s.length, label, 0)
