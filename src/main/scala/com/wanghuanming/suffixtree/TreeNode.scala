@@ -5,7 +5,7 @@ import scala.collection.mutable
 /**
   * Created by ming on 17-4-7.
   */
-class TreeNode(var seq: RangeSubString) {
+class TreeNode(var seq: RangeSubString) extends Serializable {
 
   lazy val children = new mutable.HashMap[Char, TreeNode]
   lazy val terminals = new mutable.ArrayBuffer[RangeSubString]

@@ -5,7 +5,7 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 
 
-class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
+class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) extends Serializable {
 
   val root = new TreeNode(null)
 
@@ -42,6 +42,45 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
         remain = remain.drop(cp.length)
       }
       iter = iter.childNode(ch)
+    }
+  }
+
+  /**
+    * r =seq=> origin
+    *
+    * r =front=> newNode =back=> origin
+    */
+  private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
+    assert(0 < length && length <= origin.seq.length)
+    val front = origin.seq.take(length)
+    val back = origin.seq.drop(length)
+    val newNode = new TreeNode(front)
+    origin.seq = back
+    newNode.addChild(origin)
+    newNode
+  }
+
+  def findPrefix(str: RangeSubString): Option[String] = {
+    var iter = root
+    val path = new StringBuffer
+    var remain = str
+
+    while (remain.nonEmpty && iter.children.nonEmpty) {
+      val ch = remain.head
+
+      iter.children.get(ch) match {
+        case Some(child) =>
+          path.append(child.seq.toString)
+          iter = child
+          remain = remain.drop(child.seq.length)
+        case None =>
+          return None
+      }
+    }
+    if (iter.children.isEmpty) {
+      Some(path.toString)
+    } else {
+      None
     }
   }
 
@@ -124,21 +163,6 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
     //    println(s"Time cost in splitSprefix ${duration}ms")
   }
 
-  /**
-    * r =seq=> origin
-    *
-    * r =front=> newNode =back=> origin
-    */
-  private def splitEdgeAt(origin: TreeNode, length: Int): TreeNode = {
-    assert(0 < length && length <= origin.seq.length)
-    val front = origin.seq.take(length)
-    val back = origin.seq.drop(length)
-    val newNode = new TreeNode(front)
-    origin.seq = back
-    newNode.addChild(origin)
-    newNode
-  }
-
 }
 
 object McSuffixTree {
@@ -189,17 +213,58 @@ object McSuffixTree {
     val terminalRDD = rdd.map(rs => rs.copy(source = rs.source + terminal, end = rs.end + 1)).repartition(sc.defaultParallelism)
 
     // 2. vertical partition, get sprefixes
-    val treeSize = 200 * 10000
-    val prefixes = verticalPartition(alphabet, Iterable(terminal), terminalRDD, treeSize)
+    val treeSize = 100 * 10000
+    val sprefixes = verticalPartition(alphabet, Iterable(terminal), terminalRDD, treeSize)
 
     // 3. broadcast source strings
-    val stringsBV = sc.broadcast(terminalRDD.collect)
-    val sprefixesBV = sc.broadcast(prefixes)
+    //    val stringsBV = sc.broadcast(terminalRDD.collect)
+    //    val sprefixesBV = sc.broadcast(prefixes)
 
     // 4. compute suffix-tree
-    sc.parallelize(prefixes.toSeq).map { sprefix =>
-      buildTree(stringsBV.value, sprefix, sprefixesBV.value)
+    //    sc.parallelize(prefixes.toSeq).map { sprefix =>
+    //      buildTree(stringsBV.value, sprefix, sprefixesBV.value)
+    //    }
+    buildTree(terminalRDD, sprefixes)
+  }
+
+  private def buildTree(rdd: RDD[RangeSubString], sprefixes: Iterable[String]): RDD[McSuffixTree] = {
+    val sc = rdd.context
+    val slidingLen = sprefixes.map(_.length).max
+    val sprefixTree = buildSprefixTree(sprefixes)
+
+    val sprefixTreeBV = sc.broadcast(sprefixTree)
+    val label2strBV = sc.broadcast(rdd.map(rs => rs.label -> rs.source).collectAsMap())
+    val sprefixesBV = sc.broadcast(sprefixes)
+
+    rdd.flatMap { rs =>
+      // generate all suffixes, but compressed to substring(0, sprefixLen)
+      rs.source.indices.init.map { i =>
+        // compress suffix with id
+        val sub = rs.substring(i, (i + slidingLen) min rs.length).toString
+        rs.copy(source = sub, start = 0, end = sub.length, index = i)
+      }
+    }.map(str => sprefixTreeBV.value.findPrefix(str) -> str)
+      .groupByKey()
+      .map { case (sprefixOp: Option[String], strs: Iterable[RangeSubString]) =>
+      assert(sprefixOp.nonEmpty)
+      val sprefix = sprefixOp.get
+      val tree = new McSuffixTree()
+      strs.foreach { str =>
+        val origin = label2strBV.value(str.label)
+        val actual = str.copy(source = origin, start = str.index, end = origin.length)
+        // restore compressed suffix from id
+        // build suffix tree from these suffixes
+        tree.insertSuffix(actual)
+      }
+      tree.splitSprefix(sprefixesBV.value.filter(_ != sprefix))
+      tree
     }
+  }
+
+  private def buildSprefixTree(sprefixes: Iterable[String]): McSuffixTree = {
+    val tree = new McSuffixTree
+    sprefixes.foreach { sprefix => tree.insertSuffix(RangeSubString(sprefix)) }
+    tree
   }
 
   private def getAlphabet(rdd: RDD[RangeSubString]): Iterable[Char] = {

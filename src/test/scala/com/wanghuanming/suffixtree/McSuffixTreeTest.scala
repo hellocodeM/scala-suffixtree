@@ -150,6 +150,19 @@ class McSuffixTreeTest extends FunSuite {
     val level4 = level3.flatMap(_.children.values)
     assert(level4.map(_.seq.toString).toSeq.sorted === Array("de$", "ef$").sorted)
   }
+
+  test("findPrefix") {
+    val tree = new McSuffixTree
+    tree.insertSuffix(RangeSubString("abc"))
+    tree.insertSuffix(RangeSubString("ade"))
+    tree.insertSuffix(RangeSubString("aca"))
+    tree.insertSuffix(RangeSubString("aea"))
+
+    assert(tree.findPrefix(RangeSubString("abcde")) === Some("abc"))
+    assert(tree.findPrefix(RangeSubString("ade")) === Some("ade"))
+    assert(tree.findPrefix(RangeSubString("a")).isEmpty)
+    assert(tree.findPrefix(RangeSubString("bc")).isEmpty)
+  }
 }
 
 @RunWith(classOf[JUnitRunner])
