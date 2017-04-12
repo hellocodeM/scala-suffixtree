@@ -167,42 +167,11 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) extends Se
 
 object McSuffixTree {
 
-  def buildByPrefix(str: String, label: String, terminal: String): Array[McSuffixTree] = {
+  def buildLocal(str: String, label: String, terminal: String): Array[McSuffixTree] = {
     val alphabet = Utils.getAlphabet(str)
     alphabet.par.map { prefix =>
       buildTree(Iterable(RangeSubString(str + terminal, label)), prefix.toString, alphabet.map(_.toString))
     }.toArray
-  }
-
-  /**
-    * Build general suffix-tree by s-prefix
-    *
-    * @param strs    all strings, not contains terminal
-    * @param sprefix s-prefix
-    * @return
-    */
-  private def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
-    val tree = new McSuffixTree
-
-    val start = System.currentTimeMillis()
-    var duration = 0L
-    val sprefixRS = RangeSubString(sprefix)
-    var cnt = 0
-    for (str <- strs) {
-      for (i <- 0 until str.length) {
-        if (str.startsWith(sprefixRS, i)) {
-          cnt += 1
-          val start = System.nanoTime()
-          val s = str.copy(start = i, index = i)
-          tree.insertSuffix(s)
-          duration += System.nanoTime() - start
-        }
-      }
-    }
-    val total = System.currentTimeMillis() - start
-    tree.splitSprefix(sprefixes.filter(_ != sprefix))
-    println(s"BuildTree for sprefix ($sprefix) total cost ${total}ms, insert $cnt suffixes, cost ${duration / 1000000}ms")
-    tree
   }
 
   def buildOnSpark(rdd: RDD[RangeSubString]): RDD[McSuffixTree] = {
@@ -210,24 +179,23 @@ object McSuffixTree {
     val sc = rdd.context
     val alphabet = getAlphabet(rdd)
     val terminal = getTerminal()
-    val terminalRDD = rdd.map(rs => rs.copy(source = rs.source + terminal, end = rs.end + 1)).repartition(sc.defaultParallelism)
+    val terminalRDD = rdd.map(rs => rs.copy(source = rs.source + terminal, end = rs.end + 1)).cache()
 
     // 2. vertical partition, get sprefixes
     val treeSize = 100 * 10000
     val sprefixes = verticalPartition(alphabet, Iterable(terminal), terminalRDD, treeSize)
 
-    // 3. broadcast source strings
-    //    val stringsBV = sc.broadcast(terminalRDD.collect)
-    //    val sprefixesBV = sc.broadcast(prefixes)
-
-    // 4. compute suffix-tree
-    //    sc.parallelize(prefixes.toSeq).map { sprefix =>
-    //      buildTree(stringsBV.value, sprefix, sprefixesBV.value)
-    //    }
-    buildTree(terminalRDD, sprefixes)
+    val stringCnt = terminalRDD.count()
+    if (stringCnt < sc.defaultParallelism) {
+      println(s"Since num of strings is $stringCnt < ${sc.defaultParallelism}, choose build by scanning")
+      buildByScan(terminalRDD, sprefixes)
+    } else {
+      println(s"Since num of strings is $stringCnt > ${sc.defaultParallelism}, choose build by groupBy")
+      buildByGroup(terminalRDD, sprefixes)
+    }
   }
 
-  private def buildTree(rdd: RDD[RangeSubString], sprefixes: Iterable[String]): RDD[McSuffixTree] = {
+  private def buildByGroup(rdd: RDD[RangeSubString], sprefixes: Iterable[String]): RDD[McSuffixTree] = {
     val sc = rdd.context
     val slidingLen = sprefixes.map(_.length).max
     val sprefixTree = buildSprefixTree(sprefixes)
@@ -246,19 +214,19 @@ object McSuffixTree {
     }.map(str => sprefixTreeBV.value.findPrefix(str) -> str)
       .groupByKey()
       .map { case (sprefixOp: Option[String], strs: Iterable[RangeSubString]) =>
-      assert(sprefixOp.nonEmpty)
-      val sprefix = sprefixOp.get
-      val tree = new McSuffixTree()
-      strs.foreach { str =>
-        val origin = label2strBV.value(str.label)
-        val actual = str.copy(source = origin, start = str.index, end = origin.length)
-        // restore compressed suffix from id
-        // build suffix tree from these suffixes
-        tree.insertSuffix(actual)
+        assert(sprefixOp.nonEmpty)
+        val sprefix = sprefixOp.get
+        val tree = new McSuffixTree()
+        strs.foreach { str =>
+          val origin = label2strBV.value(str.label)
+          val actual = str.copy(source = origin, start = str.index, end = origin.length)
+          // restore compressed suffix from id
+          // build suffix tree from these suffixes
+          tree.insertSuffix(actual)
+        }
+        tree.splitSprefix(sprefixesBV.value.filter(_ != sprefix))
+        tree
       }
-      tree.splitSprefix(sprefixesBV.value.filter(_ != sprefix))
-      tree
-    }
   }
 
   private def buildSprefixTree(sprefixes: Iterable[String]): McSuffixTree = {
@@ -281,6 +249,8 @@ object McSuffixTree {
                         rdd: RDD[RangeSubString],
                         batchSize: Int): Iterable[String] = {
     val sc = rdd.context
+    val stringCnt = rdd.count().toInt
+    val strings = rdd.repartition(stringCnt)
     sc.setLogLevel("WARN")
     println("=============VertialPartition===============")
     val res = mutable.ArrayBuffer[String]()
@@ -296,7 +266,7 @@ object McSuffixTree {
       val counts = pending.map { sprefix =>
         val len = sprefix.length
         val sprefixs = len2strs.getOrElseUpdate(len, {
-          rdd.flatMap(_.source.sliding(len).map(_ -> 1))
+          strings.flatMap(_.source.sliding(len).map(_ -> 1))
             .reduceByKey(_ + _)
             .collect()
             .toMap
@@ -317,6 +287,40 @@ object McSuffixTree {
 
     println(s"============After Vertical Paritition, ${res.length} parts,they are $res")
     res
+  }
+
+  private def buildByScan(rdd: RDD[RangeSubString], sprefixes: Iterable[String]): RDD[McSuffixTree] = {
+    val sc = rdd.context
+    val stringsBV = sc.broadcast(rdd.collect)
+    val sprefixesBV = sc.broadcast(sprefixes)
+
+    sc.parallelize(sprefixes.toSeq).map { sprefix =>
+      buildTree(stringsBV.value, sprefix, sprefixesBV.value)
+    }
+  }
+
+  private def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
+    val tree = new McSuffixTree
+
+    val start = System.currentTimeMillis()
+    var duration = 0L
+    val sprefixRS = RangeSubString(sprefix)
+    var cnt = 0
+    for (str <- strs) {
+      for (i <- 0 until str.length) {
+        if (str.startsWith(sprefixRS, i)) {
+          cnt += 1
+          val start = System.nanoTime()
+          val s = str.copy(start = i, index = i)
+          tree.insertSuffix(s)
+          duration += System.nanoTime() - start
+        }
+      }
+    }
+    val total = System.currentTimeMillis() - start
+    tree.splitSprefix(sprefixes.filter(_ != sprefix))
+    println(s"BuildTree for sprefix ($sprefix) total cost ${total}ms, insert $cnt suffixes, cost ${duration / 1000000}ms")
+    tree
   }
 }
 
