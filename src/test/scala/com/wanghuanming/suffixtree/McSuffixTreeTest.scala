@@ -163,7 +163,7 @@ class ExsetMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("exset") {
-    for (i <- 0 to 3) {
+    for (i <- 0 to 4) {
       val inputDir = filePath("ex" + i)
       val res = "res" + i
       val files = new File(inputDir).listFiles()
@@ -197,13 +197,11 @@ class ExsetMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
   }
 
   test("onSpark") {
-    for (i <- 0 to 3) {
+    for (i <- 0 to 4) {
       val inputFile = "ex" + i
       val res = "res" + i
       val rdd = Utils.readAsRDD(sc, filePath(inputFile))
-      val strs = rdd.collect()
-      val terminal = Utils.genTerminal(Utils.getAlphabet(strs)).toString
-      val trees = McSuffixTree.buildOnSpark(sc, rdd, strs, terminal)
+      val trees = McSuffixTree.buildOnSpark(rdd)
       val suffixes = trees.flatMap(_.suffixes).collect()
       assert(suffixes.toSet === expectedResult(res).toSet)
     }
@@ -220,7 +218,7 @@ class ExsetMcSuffixTreeTest extends FunSuite with BeforeAndAfter {
       RangeSubString("b$")
     )
 
-    val res = McSuffixTree.verticalPartition(sc, alphabet, sc.parallelize(strs.toSeq), 2)
+    val res = McSuffixTree.verticalPartition(alphabet, Array('$'), sc.parallelize(strs.toSeq), 2)
     val exp = Set("e", "abc", "cd", "c$", "ab$", "b$", "bd", "bcd", "bc$", "d")
     assert(res.toSet === exp)
   }

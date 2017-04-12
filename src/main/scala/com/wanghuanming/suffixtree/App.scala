@@ -14,11 +14,8 @@ object App {
     val input = args(0)
     val output = args(1)
     val rdd = Utils.readAsRDD(sc, input)
-    val strs = rdd.collect()
-    val alphabet = Utils.getAlphabet(strs)
-    val terminal = Utils.genTerminal(alphabet).toString
 
-    val trees = McSuffixTree.buildOnSpark(sc, rdd, strs, terminal)
+    val trees = McSuffixTree.buildOnSpark(rdd)
     val suffixes = trees.flatMap(_.suffixes)
     suffixes.saveAsTextFile(output)
   }

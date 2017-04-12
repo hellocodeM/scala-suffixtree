@@ -1,6 +1,5 @@
 package com.wanghuanming.suffixtree
 
-import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
@@ -50,13 +49,15 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
     val leaves = new mutable.ArrayBuffer[String]()
 
     def dfs(r: TreeNode, height: Int): Unit = {
-      r.terminals.foreach(terminal =>
-        leaves += Utils.formatNode(terminal.label, height, terminal.index)
-      )
       assert(r == root || r.seq.nonEmpty)
       if (r.children.isEmpty && r.seq != null) {
-        leaves += Utils.formatNode(r.seq.label, height, r.seq.index)
-      } else {
+        val h = if (r.terminals.nonEmpty && r.seq.length > 1) height + 1 else height
+        r.terminals.foreach { terminal =>
+          leaves += Utils.formatNode(terminal.label, h, terminal.index)
+        }
+        leaves += Utils.formatNode(r.seq.label, h, r.seq.index)
+      } else if (r.children.nonEmpty) {
+        assert(r.terminals.isEmpty)
         for ((ch, child) <- r.children) {
           dfs(child, height + 1)
         }
@@ -96,7 +97,7 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
   }
 
   def splitSprefix(sprefixes: Iterable[String]): Unit = {
-    if (root.children.isEmpty) {
+    if (root.children == null || root.children.isEmpty) {
       return
     }
     assert(root.children.size == 1)
@@ -146,21 +147,34 @@ object McSuffixTree {
     }.toArray
   }
 
-  def buildOnSpark(sc: SparkContext, rdd: RDD[RangeSubString], strs: Iterable[RangeSubString], terminal: String): RDD[McSuffixTree] = {
-    val terminalRDD = rdd.zipWithIndex().map { case (s, i) =>
-      val terminal = (i + 255).toChar
-      s.copy(source = s.source + terminal, end = s.end + 1)
-    }
-    val terminalSymbols = (0 until strs.size).map(x => (x + 255).toChar)
-    val alphabet = Utils.getAlphabet(strs)
-    val prefixes = verticalPartition(alphabet, terminalSymbols, terminalRDD, 100000)
+  def buildOnSpark(rdd: RDD[RangeSubString]): RDD[McSuffixTree] = {
+    // 1. add terminal symbol to source strings
+    val sc = rdd.context
+    val alphabet = getAlphabet(rdd)
+    val terminal = getTerminal()
+    val terminalRDD = rdd.map(rs => rs.copy(source = rs.source + terminal, end = rs.end + 1)).repartition(sc.defaultParallelism)
 
-    val strsBV = sc.broadcast(terminalRDD.collect)
+    // 2. vertical partition, get sprefixes
+    val treeSize = 100 * 10000
+    val prefixes = verticalPartition(alphabet, Iterable(terminal), terminalRDD, treeSize)
+
+    // 3. broadcast source strings
+    val stringsBV = sc.broadcast(terminalRDD.collect)
     val sprefixesBV = sc.broadcast(prefixes)
 
+    // 4. compute suffix-tree
     sc.parallelize(prefixes.toSeq).map { sprefix =>
-      buildTree(strsBV.value, sprefix, sprefixesBV.value)
+      buildTree(stringsBV.value, sprefix, sprefixesBV.value)
     }
+  }
+
+  private def getAlphabet(rdd: RDD[RangeSubString]): Iterable[Char] = {
+    rdd.flatMap(_.source.distinct).distinct().collect
+  }
+
+  private def getTerminal(): Char = {
+    // 数据字符保证在ASCII之内，因此用ASCII之外的符号就可以
+    255.toChar
   }
 
   /**
@@ -170,11 +184,11 @@ object McSuffixTree {
     * @param sprefix s-prefix
     * @return
     */
-  def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
+  private def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
     val tree = new McSuffixTree
 
     for (s <- strs) {
-      val str = s.toString
+      val str = s.toString.intern()
       for (i <- str.indices.init) {
         if (str.startsWith(sprefix, i)) {
           tree.insertSuffix(RangeSubString(str, i, str.length, s.label, i))
