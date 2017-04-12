@@ -100,25 +100,28 @@ class McSuffixTree(terminalSymbol: String = "$", baseHeight: Int = 0) {
     if (root.children == null || root.children.isEmpty) {
       return
     }
+    val start = System.currentTimeMillis()
     assert(root.children.size == 1)
     val head = root.children.head._1
     var level1 = root.children.head._2
     val sprefix = level1.seq
-    println(s"Spliting prefix,sprefix=$sprefix,level1=${level1.seq}")
+    //    println(s"Spliting prefix,sprefix=$sprefix,level1=${level1.seq}")
 
     var end = level1.seq.length - 1
 
     while (end >= 1) {
-      val common = level1.seq.substring(0, end)
-      if (sprefixes.exists(_.startsWith(common.toString))) {
+      val common = level1.seq.substring(0, end).toString
+      if (sprefixes.exists(_.startsWith(common))) {
         level1 = splitEdgeAt(level1, common.length)
         root.updateChild(head, level1)
         end = level1.seq.length - 1
-        println(s"Spliting prefix,sprefix=$sprefix,level1=${level1.seq}")
+        //        println(s"Spliting prefix,sprefix=$sprefix,level1=${level1.seq}")
       } else {
         end -= 1
       }
     }
+    val duration = System.currentTimeMillis() - start
+    //    println(s"Time cost in splitSprefix ${duration}ms")
   }
 
   /**
@@ -147,6 +150,37 @@ object McSuffixTree {
     }.toArray
   }
 
+  /**
+    * Build general suffix-tree by s-prefix
+    *
+    * @param strs    all strings, not contains terminal
+    * @param sprefix s-prefix
+    * @return
+    */
+  private def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
+    val tree = new McSuffixTree
+
+    val start = System.currentTimeMillis()
+    var duration = 0L
+    val sprefixRS = RangeSubString(sprefix)
+    var cnt = 0
+    for (str <- strs) {
+      for (i <- 0 until str.length) {
+        if (str.startsWith(sprefixRS, i)) {
+          cnt += 1
+          val start = System.nanoTime()
+          val s = str.copy(start = i, index = i)
+          tree.insertSuffix(s)
+          duration += System.nanoTime() - start
+        }
+      }
+    }
+    val total = System.currentTimeMillis() - start
+    tree.splitSprefix(sprefixes.filter(_ != sprefix))
+    println(s"BuildTree for sprefix ($sprefix) total cost ${total}ms, insert $cnt suffixes, cost ${duration / 1000000}ms")
+    tree
+  }
+
   def buildOnSpark(rdd: RDD[RangeSubString]): RDD[McSuffixTree] = {
     // 1. add terminal symbol to source strings
     val sc = rdd.context
@@ -155,7 +189,7 @@ object McSuffixTree {
     val terminalRDD = rdd.map(rs => rs.copy(source = rs.source + terminal, end = rs.end + 1)).repartition(sc.defaultParallelism)
 
     // 2. vertical partition, get sprefixes
-    val treeSize = 100 * 10000
+    val treeSize = 200 * 10000
     val prefixes = verticalPartition(alphabet, Iterable(terminal), terminalRDD, treeSize)
 
     // 3. broadcast source strings
@@ -175,28 +209,6 @@ object McSuffixTree {
   private def getTerminal(): Char = {
     // 数据字符保证在ASCII之内，因此用ASCII之外的符号就可以
     255.toChar
-  }
-
-  /**
-    * Build general suffix-tree by s-prefix
-    *
-    * @param strs    all strings, not contains terminal
-    * @param sprefix s-prefix
-    * @return
-    */
-  private def buildTree(strs: Iterable[RangeSubString], sprefix: String, sprefixes: Iterable[String]): McSuffixTree = {
-    val tree = new McSuffixTree
-
-    for (s <- strs) {
-      val str = s.toString.intern()
-      for (i <- str.indices.init) {
-        if (str.startsWith(sprefix, i)) {
-          tree.insertSuffix(RangeSubString(str, i, str.length, s.label, i))
-        }
-      }
-    }
-    tree.splitSprefix(sprefixes.filter(_ != sprefix))
-    tree
   }
 
   def verticalPartition(alphabet: Iterable[Char],

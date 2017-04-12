@@ -13,6 +13,13 @@ class RangeSubStringTest extends FunSuite {
     assert("ello" === s.take(10).toString)
   }
 
+  test("startsWith") {
+    val s = RangeSubString("hello")
+    assert(s.startsWith(RangeSubString("ello"), 1))
+    assert(!s.startsWith(RangeSubString("ellosdf"), 1))
+    assert(!s.startsWith(RangeSubString("ello"), 2))
+  }
+
   test("commonPrefix") {
     val cases = Iterable(
       ("hello", "helle", "hell"),

@@ -19,9 +19,10 @@ case class RangeSubString(source: String, start: Int, end: Int, label: String, i
 
   def last: Char = source(end - 1)
 
-  /**
-    * Common prefix but exclude terminal symbol, such as '$'.
-    */
+  def startsWith(rhs: RangeSubString, i: Int): Boolean = {
+    this.drop(i).commonPrefix(rhs).length == rhs.length
+  }
+
   def commonPrefix(rhs: RangeSubString): RangeSubString = {
     val len = length min rhs.length
     for (i <- 0 until len) {
@@ -32,14 +33,14 @@ case class RangeSubString(source: String, start: Int, end: Int, label: String, i
     this.substring(0, len)
   }
 
+  def take(n: Int) = substring(0, Math.min(this.length, n))
+
   def length = end - start
 
   def substring(s: Int, e: Int) = {
     assert(s <= e)
-    RangeSubString(source, start + s, start + e, label, index)
+    this.copy(start = start + s, end = start + e)
   }
-
-  def take(n: Int) = substring(0, Math.min(this.length, n))
 
   def drop(n: Int) = substring(Math.min(this.length, n), length)
 
