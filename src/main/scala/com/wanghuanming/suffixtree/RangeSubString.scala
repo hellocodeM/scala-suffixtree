@@ -13,7 +13,7 @@ case class RangeSubString(source: String, start: Int, end: Int, label: String, i
 
   def nonEmpty = source.nonEmpty && start < end
 
-  def substring(s: Int) = RangeSubString(source, start + s, end, label, index)
+  def substring(s: Int) = this.copy(start = start + s)
 
   def head: Char = source(start)
 
@@ -44,7 +44,7 @@ case class RangeSubString(source: String, start: Int, end: Int, label: String, i
 
   def drop(n: Int) = substring(Math.min(this.length, n), length)
 
-  override def toString = mkString
+  override def toString = s"$label:$index[$start:$end]"
 
   def mkString = source.substring(start, end)
 }

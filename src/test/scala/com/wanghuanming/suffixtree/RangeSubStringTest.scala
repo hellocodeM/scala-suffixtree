@@ -9,8 +9,8 @@ class RangeSubStringTest extends FunSuite {
 
   test("take") {
     val s = RangeSubString("hello", 1, 5, "label", 0)
-    assert("el" === s.take(2).toString)
-    assert("ello" === s.take(10).toString)
+    assert("el" === s.take(2).mkString)
+    assert("ello" === s.take(10).mkString)
   }
 
   test("startsWith") {
@@ -32,7 +32,7 @@ class RangeSubStringTest extends FunSuite {
       val s1 = RangeSubString(c._1)
       val s2 = RangeSubString(c._2)
       val common = s1.commonPrefix(s2)
-      assert(c._3 === common.toString)
+      assert(c._3 === common.mkString)
     }
   }
 

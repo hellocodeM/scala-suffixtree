@@ -13,9 +13,9 @@ import scala.collection.mutable
 object Utils {
 
   def readAsRDD(sc: SparkContext, filePath: String): RDD[RangeSubString] = {
-    sc.wholeTextFiles(filePath)
+    sc.wholeTextFiles(filePath, sc.defaultParallelism * 4)
       .map { case (path, content) =>
-        val name = new File(path).getName
+        val name = new File(path).getName.intern()
         RangeSubString(content.replace("\n", ""), name)
       }
   }
@@ -27,7 +27,7 @@ object Utils {
   def getAlphabet(strs: Iterable[RangeSubString]): String = {
     val chars = mutable.HashSet[Char]()
     for (str <- strs) {
-      chars ++= str.toString
+      chars ++= str.mkString
     }
     chars.mkString
   }
